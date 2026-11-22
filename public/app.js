@@ -13,6 +13,7 @@ const loginBtn = document.getElementById('loginBtn');
 const loginError = document.getElementById('loginError');
 
 const setup2FAForm = document.getElementById('setup2FAForm');
+const qrCodeImg = document.getElementById('qrCodeImg');
 const secretCodeDisplay = document.getElementById('secretCodeDisplay');
 const copySecretBtn = document.getElementById('copySecretBtn');
 const setup2FACodeInput = document.getElementById('setup2FACodeInput');
@@ -75,9 +76,14 @@ loginForm.addEventListener('submit', async (e) => {
       currentTempToken = data.tempToken;
 
       if (data.require2FASetup) {
-        // Primera vez: mostrar configuración de 2FA
+        // Primera vez: mostrar Código QR y clave
         secretCodeDisplay.textContent = data.secret;
         copySecretBtn.setAttribute('data-secret', data.secret);
+        
+        if (data.otpauthUrl && qrCodeImg) {
+          qrCodeImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(data.otpauthUrl)}`;
+        }
+
         loginSection.classList.add('hidden');
         setup2FASection.classList.remove('hidden');
         setup2FACodeInput.focus();

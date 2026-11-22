@@ -24,15 +24,20 @@
     </div>
   </div>
 
-  <!-- Paso 2A: Configuración Inicial de 2FA (Solo la primera vez) -->
+  <!-- Paso 2A: Configuración Inicial de 2FA con Código QR -->
   <div id="setup2FASection" class="login-container hidden">
     <div class="login-card" style="max-width: 480px;">
       <div class="logo">📲 Activar Doble Factor (2FA)</div>
-      <h2>Configuración de Seguridad</h2>
-      <p class="subtitle">Abre tu app <strong>Google Authenticator</strong> o <strong>Authy</strong> en tu móvil y agrega una nueva cuenta:</p>
+      <h2>Escanea el Código QR</h2>
+      <p class="subtitle">Abre <strong>Google Authenticator</strong> en tu móvil y escanea este código con tu cámara:</p>
       
+      <!-- Contenedor del Código QR -->
+      <div class="qr-container">
+        <img id="qrCodeImg" src="" alt="Código QR 2FA" class="qr-image">
+      </div>
+
       <div class="secret-box">
-        <label>Clave Secreta para ingresar en tu app:</label>
+        <label>O si prefieres escribir la clave manual:</label>
         <div class="secret-code" id="secretCodeDisplay">XXXX-XXXX-XXXX</div>
         <button type="button" id="copySecretBtn" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem;">📋 Copiar Clave</button>
       </div>
