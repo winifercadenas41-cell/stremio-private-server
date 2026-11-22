@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de Administración | Torbox VIP Streams</title>
+  <link rel="stylesheet" href="/public/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Pantalla de Login -->
+  <div id="loginSection" class="login-container">
+    <div class="login-card">
+      <div class="logo">⚡ Torbox VIP</div>
+      <h2>Acceso al Panel</h2>
+      <p class="subtitle">Introduce la contraseña de administrador</p>
+      <form id="loginForm">
+        <input type="password" id="adminPasswordInput" placeholder="Contraseña Maestra" required autofocus>
+        <button type="submit" class="btn btn-primary">Entrar al Panel</button>
+      </form>
+      <div id="loginError" class="error-msg"></div>
+    </div>
+  </div>
+
+  <!-- Dashboard Principal -->
+  <div id="dashboardSection" class="dashboard-container hidden">
+    <!-- Navbar -->
+    <header class="navbar">
+      <div class="brand">
+        <span class="brand-icon">⚡</span>
+        <div>
+          <h1>Torbox VIP Streams</h1>
+          <span class="badge badge-success">Servidor Activo</span>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button id="refreshBtn" class="btn btn-secondary">🔄 Actualizar</button>
+        <button id="logoutBtn" class="btn btn-danger-outline">Salir</button>
+      </div>
+    </header>
+
+    <!-- Métricas / Estadísticas -->
+    <section class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-title">Total Clientes</div>
+        <div id="statTotalUsers" class="stat-value">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">Pantallas en Vivo Ahora</div>
+        <div id="statLiveStreams" class="stat-value text-emerald">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">Planes 1080p</div>
+        <div id="statStandardUsers" class="stat-value">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">Planes 4K Ultra HD</div>
+        <div id="statPremiumUsers" class="stat-value text-amber">0</div>
+      </div>
+    </section>
+
+    <!-- Barra de Acciones -->
+    <section class="action-bar">
+      <h2>Gestión de Cuentas</h2>
+      <button id="openCreateModalBtn" class="btn btn-primary">
+        <span>➕</span> Crear Nueva Cuenta
+      </button>
+    </section>
+
+    <!-- Tabla de Clientes -->
+    <div class="table-container">
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>Estado</th>
+            <th>Cliente / Correo</th>
+            <th>Resolución</th>
+            <th>Pantallas</th>
+            <th>Sesiones en Vivo</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="usersTableBody">
+          <!-- Inyectado por JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal Crear Cuenta -->
+  <div id="createModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Crear Cuenta de Stremio</h3>
+        <button class="close-modal-btn" data-close="createModal">&times;</button>
+      </div>
+      <form id="createUserForm">
+        <div class="form-group">
+          <label>Nombre del Cliente</label>
+          <input type="text" id="newUserName" placeholder="Ej: Familia Gómez" required>
+        </div>
+        <div class="form-group">
+          <label>Correo Electrónico (opcional - dejar vacío para autogenerar)</label>
+          <input type="email" id="newUserEmail" placeholder="gomez@stremio.com">
+        </div>
+        <div class="form-group">
+          <label>Contraseña (opcional - dejar vacío para autogenerar)</label>
+          <input type="text" id="newUserPassword" placeholder="Generar automáticamente">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Resolución Máxima</label>
+            <select id="newUserRes">
+              <option value="1080p" selected>1080p Full HD (Estándar)</option>
+              <option value="4k">4K Ultra HD + HDR (Premium)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Límite de Pantallas Simultáneas</label>
+            <select id="newUserScreens">
+              <option value="1">1 Pantalla</option>
+              <option value="2">2 Pantallas</option>
+              <option value="3">3 Pantallas</option>
+              <option value="4" selected>4 Pantallas</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" data-close="createModal">Cancelar</button>
+          <button type="submit" id="submitCreateBtn" class="btn btn-primary">Crear Cuenta Automática</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Editar Plan -->
+  <div id="editModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Editar Plan del Cliente</h3>
+        <button class="close-modal-btn" data-close="editModal">&times;</button>
+      </div>
+      <form id="editUserForm">
+        <input type="hidden" id="editUserUuid">
+        <div class="form-group">
+          <label>Nombre</label>
+          <input type="text" id="editUserName" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Resolución</label>
+            <select id="editUserRes">
+              <option value="1080p">1080p Full HD (Estándar)</option>
+              <option value="4k">4K Ultra HD (Premium)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Pantallas Simultáneas</label>
+            <select id="editUserScreens">
+              <option value="1">1 Pantalla</option>
+              <option value="2">2 Pantallas</option>
+              <option value="3">3 Pantallas</option>
+              <option value="4">4 Pantallas</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" data-close="editModal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Credenciales Creadas -->
+  <div id="credentialsModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>¡Cuenta Creada con Éxito! 🎉</h3>
+        <button class="close-modal-btn" data-close="credentialsModal">&times;</button>
+      </div>
+      <p class="subtitle">Copia y envía este mensaje a tu cliente:</p>
+      <textarea id="credentialsMessage" rows="9" readonly></textarea>
+      <div class="modal-actions">
+        <button id="copyCredentialsBtn" class="btn btn-primary">📋 Copiar para WhatsApp</button>
+        <button type="button" class="btn btn-secondary" data-close="credentialsModal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/public/app.js"></script>
+</body>
+</html>

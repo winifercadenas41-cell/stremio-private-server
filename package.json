@@ -1,0 +1,20 @@
+{
+  "name": "stremio-private-server",
+  "version": "1.0.0",
+  "description": "Servidor privado de AIOStreams con panel de administración, creación automática de cuentas de Stremio, límites de pantallas y resolución",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "uuid": "^9.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
