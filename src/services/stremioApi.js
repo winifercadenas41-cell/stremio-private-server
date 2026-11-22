@@ -31,36 +31,47 @@ export async function registerStremioAccount(email, password) {
       };
     }
 
-    // Si el correo ya existe, intentamos login
-    if (data.error && (data.error.includes('already') || data.error.includes('exists') || registerResponse.status === 400)) {
-      console.log(`[StremioAPI] Correo ${email} ya existe, intentando login...`);
-      const loginResponse = await fetch(`${STREMIO_API_URL}/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'login',
-          email,
-          password
-        })
-      });
+    // Convertir el error de Stremio a texto de forma segura (sea string u objeto)
+    const errorStr = (
+      typeof data.error === 'string'
+        ? data.error
+        : (data.error?.message || JSON.stringify(data.error || ''))
+    ).toLowerCase();
 
-      const loginData = await loginResponse.json();
-      if (loginData.result && loginData.result.authKey) {
-        return {
-          success: true,
-          authKey: loginData.result.authKey,
-          userId: loginData.result.user?._id || null,
-          isNew: false
-        };
-      }
+    // 2. Si el registro falló (por ejemplo, porque la cuenta ya existe), intentar login
+    console.log(`[StremioAPI] Registro no completado (${errorStr}), intentando login para cuenta existente...`);
+    
+    const loginResponse = await fetch(`${STREMIO_API_URL}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'login',
+        email,
+        password
+      })
+    });
+
+    const loginData = await loginResponse.json();
+    if (loginData.result && loginData.result.authKey) {
+      console.log(`[StremioAPI] Login exitoso para la cuenta existente: ${email}`);
+      return {
+        success: true,
+        authKey: loginData.result.authKey,
+        userId: loginData.result.user?._id || null,
+        isNew: false
+      };
     }
+
+    const loginErrorStr = typeof loginData.error === 'string'
+      ? loginData.error
+      : (loginData.error?.message || 'Error en inicio de sesión. Verifica que la contraseña coincida con la de tu cuenta de Stremio.');
 
     return {
       success: false,
-      error: data.error || 'Error al registrar cuenta en Stremio'
+      error: loginErrorStr
     };
   } catch (error) {
-    console.error('[StremioAPI] Error en registro:', error);
+    console.error('[StremioAPI] Error en registro/login:', error);
     return {
       success: false,
       error: error.message
