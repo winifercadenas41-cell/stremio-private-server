@@ -8,5 +8,7 @@ export const config = {
   baseUrl: (process.env.BASE_URL || 'http://localhost:3000').replace(/\/+$/, ''),
   serviceName: process.env.SERVICE_NAME || 'Torbox VIP Streams',
   sessionTimeoutMinutes: parseInt(process.env.SESSION_TIMEOUT_MINUTES || '60', 10),
-  warningVideoUrl: process.env.WARNING_VIDEO_URL || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+  warningVideoUrl: process.env.WARNING_VIDEO_URL || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+  githubToken: process.env.GITHUB_TOKEN || '',
+  githubRepo: process.env.GITHUB_REPO || 'winifercadenas41-cell/stremio-private-server'
 };
