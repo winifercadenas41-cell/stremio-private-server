@@ -7,7 +7,6 @@ const __dirname = path.dirname(__filename);
 const DATA_DIR = path.resolve(__dirname, '../../data');
 const DB_FILE = path.join(DATA_DIR, 'database.json');
 
-// Asegurar que existe el directorio de datos
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
@@ -16,7 +15,10 @@ class Database {
   constructor() {
     this.data = {
       users: [],
-      settings: {}
+      settings: {
+        twoFactorSecret: null,
+        twoFactorEnabled: false
+      }
     };
     this.load();
   }
@@ -25,16 +27,15 @@ class Database {
     try {
       if (fs.existsSync(DB_FILE)) {
         const raw = fs.readFileSync(DB_FILE, 'utf-8');
-        this.data = JSON.parse(raw);
-        if (!Array.isArray(this.data.users)) {
-          this.data.users = [];
-        }
+        const parsed = JSON.parse(raw);
+        this.data.users = Array.isArray(parsed.users) ? parsed.users : [];
+        this.data.settings = parsed.settings || { twoFactorSecret: null, twoFactorEnabled: false };
       } else {
         this.save();
       }
     } catch (err) {
-      console.error('[DB] Error cargando base de datos, iniciando limpia:', err);
-      this.data = { users: [], settings: {} };
+      console.error('[DB] Error cargando base de datos:', err);
+      this.data = { users: [], settings: { twoFactorSecret: null, twoFactorEnabled: false } };
     }
   }
 
@@ -124,6 +125,20 @@ class Database {
       standardUsers,
       premiumUsers
     };
+  }
+
+  // Métodos de configuración y 2FA
+  getSettings() {
+    if (!this.data.settings) {
+      this.data.settings = { twoFactorSecret: null, twoFactorEnabled: false };
+    }
+    return this.data.settings;
+  }
+
+  updateSettings(newSettings) {
+    this.data.settings = { ...this.getSettings(), ...newSettings };
+    this.save();
+    return this.data.settings;
   }
 }
 

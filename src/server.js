@@ -12,6 +12,25 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// ----------------------------------------------------
+// CABECERAS DE MÁXIMA SEGURIDAD (HTTP Hardening)
+// ----------------------------------------------------
+app.use((req, res, next) => {
+  // Evitar que la página sea incrustada en iframes externos (Anti-Clickjacking)
+  res.setHeader('X-Frame-Options', 'DENY');
+  // Evitar que el navegador adivine tipos MIME (Anti-Sniffing)
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  // Habilitar protección XSS
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  // Ocultar cabeceras de servidor
+  res.removeHeader('X-Powered-By');
+  // Forzar HTTPS en navegadores
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  // Política de referrer estricta
+  res.setHeader('Referrer-Policy', 'same-origin');
+  next();
+});
+
 // Middlewares globales
 app.use(cors());
 app.use(express.json());
@@ -25,7 +44,7 @@ app.get(['/', '/admin'], (req, res) => {
   res.sendFile(path.resolve(__dirname, 'views/admin.html'));
 });
 
-// Rutas de la API de Administración
+// Rutas de la API de Administración protegidas
 app.use('/admin/api', adminRouter);
 
 // Rutas del protocolo Stremio Addon
@@ -44,7 +63,7 @@ app.listen(config.port, '0.0.0.0', () => {
   console.log(`====================================================`);
   console.log(`⚡ ${config.serviceName} iniciado con éxito`);
   console.log(`📍 Servidor escuchando en: http://localhost:${config.port}`);
-  console.log(`🖥️  Panel de Administración: http://localhost:${config.port}/admin`);
+  console.log(`🛡️  Panel de Administración (Blindado): http://localhost:${config.port}/admin`);
   console.log(`💓 Monitor Health: http://localhost:${config.port}/health`);
   console.log(`====================================================`);
 });

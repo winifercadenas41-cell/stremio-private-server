@@ -3,24 +3,63 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Panel de Administración | Torbox VIP Streams</title>
+  <title>Panel de Administración Blindado | Torbox VIP</title>
   <link rel="stylesheet" href="/public/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
-  <!-- Pantalla de Login -->
+  <!-- Paso 1: Login con Contraseña -->
   <div id="loginSection" class="login-container">
     <div class="login-card">
       <div class="logo">⚡ Torbox VIP</div>
-      <h2>Acceso al Panel</h2>
+      <h2>Acceso Seguro</h2>
       <p class="subtitle">Introduce la contraseña de administrador</p>
       <form id="loginForm">
         <input type="password" id="adminPasswordInput" placeholder="Contraseña Maestra" required autofocus>
-        <button type="submit" class="btn btn-primary">Entrar al Panel</button>
+        <button type="submit" id="loginBtn" class="btn btn-primary">Continuar</button>
       </form>
       <div id="loginError" class="error-msg"></div>
+    </div>
+  </div>
+
+  <!-- Paso 2A: Configuración Inicial de 2FA (Solo la primera vez) -->
+  <div id="setup2FASection" class="login-container hidden">
+    <div class="login-card" style="max-width: 480px;">
+      <div class="logo">📲 Activar Doble Factor (2FA)</div>
+      <h2>Configuración de Seguridad</h2>
+      <p class="subtitle">Abre tu app <strong>Google Authenticator</strong> o <strong>Authy</strong> en tu móvil y agrega una nueva cuenta:</p>
+      
+      <div class="secret-box">
+        <label>Clave Secreta para ingresar en tu app:</label>
+        <div class="secret-code" id="secretCodeDisplay">XXXX-XXXX-XXXX</div>
+        <button type="button" id="copySecretBtn" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem;">📋 Copiar Clave</button>
+      </div>
+
+      <form id="setup2FAForm" style="margin-top: 1.5rem;">
+        <div class="form-group">
+          <label>Ingresa el código de 6 dígitos que muestra tu app:</label>
+          <input type="text" id="setup2FACodeInput" placeholder="000000" maxlength="6" pattern="[0-9]{6}" required autofocus style="text-align: center; font-size: 1.5rem; letter-spacing: 0.3em;">
+        </div>
+        <button type="submit" id="verifySetupBtn" class="btn btn-primary" style="width: 100%;">Vincular y Entrar</button>
+      </form>
+      <div id="setup2FAError" class="error-msg"></div>
+    </div>
+  </div>
+
+  <!-- Paso 2B: Verificación 2FA Habitual -->
+  <div id="verify2FASection" class="login-container hidden">
+    <div class="login-card">
+      <div class="logo">🔐 Verificación 2FA</div>
+      <h2>Código de Seguridad</h2>
+      <p class="subtitle">Ingresa el código de 6 dígitos generado por tu app Google Authenticator</p>
+      <form id="verify2FAForm">
+        <input type="text" id="verify2FACodeInput" placeholder="000000" maxlength="6" pattern="[0-9]{6}" required autofocus style="text-align: center; font-size: 1.5rem; letter-spacing: 0.3em;">
+        <button type="submit" id="verify2FABtn" class="btn btn-primary">Verificar y Acceder</button>
+      </form>
+      <div id="verify2FAError" class="error-msg"></div>
+      <button type="button" id="backToLoginBtn" class="btn btn-secondary btn-sm" style="margin-top: 1rem;">← Volver al inicio</button>
     </div>
   </div>
 
@@ -32,12 +71,12 @@
         <span class="brand-icon">⚡</span>
         <div>
           <h1>Torbox VIP Streams</h1>
-          <span class="badge badge-success">Servidor Activo</span>
+          <span class="badge badge-success">🛡️ Blindaje 2FA Activo</span>
         </div>
       </div>
       <div class="nav-actions">
         <button id="refreshBtn" class="btn btn-secondary">🔄 Actualizar</button>
-        <button id="logoutBtn" class="btn btn-danger-outline">Salir</button>
+        <button id="logoutBtn" class="btn btn-danger-outline">Cerrar Sesión</button>
       </div>
     </header>
 

@@ -1,11 +1,31 @@
-let authToken = localStorage.getItem('torbox_admin_token') || '';
+let authToken = localStorage.getItem('torbox_admin_session') || '';
+let currentTempToken = '';
 
-// Elementos DOM
+// Elementos DOM de Autenticación
 const loginSection = document.getElementById('loginSection');
+const setup2FASection = document.getElementById('setup2FASection');
+const verify2FASection = document.getElementById('verify2FASection');
 const dashboardSection = document.getElementById('dashboardSection');
+
 const loginForm = document.getElementById('loginForm');
 const adminPasswordInput = document.getElementById('adminPasswordInput');
+const loginBtn = document.getElementById('loginBtn');
 const loginError = document.getElementById('loginError');
+
+const setup2FAForm = document.getElementById('setup2FAForm');
+const secretCodeDisplay = document.getElementById('secretCodeDisplay');
+const copySecretBtn = document.getElementById('copySecretBtn');
+const setup2FACodeInput = document.getElementById('setup2FACodeInput');
+const setup2FAError = document.getElementById('setup2FAError');
+const verifySetupBtn = document.getElementById('verifySetupBtn');
+
+const verify2FAForm = document.getElementById('verify2FAForm');
+const verify2FACodeInput = document.getElementById('verify2FACodeInput');
+const verify2FAError = document.getElementById('verify2FAError');
+const verify2FABtn = document.getElementById('verify2FABtn');
+const backToLoginBtn = document.getElementById('backToLoginBtn');
+
+// Elementos DOM del Dashboard
 const logoutBtn = document.getElementById('logoutBtn');
 const refreshBtn = document.getElementById('refreshBtn');
 
@@ -32,10 +52,15 @@ if (authToken) {
   showDashboard();
 }
 
-// Iniciar sesión
+// ----------------------------------------------------
+// PASO 1: Ingreso de Contraseña con Protección
+// ----------------------------------------------------
 loginForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   loginError.textContent = '';
+  loginBtn.disabled = true;
+  loginBtn.textContent = 'Verificando...';
+
   const password = adminPasswordInput.value.trim();
 
   try {
@@ -47,35 +72,153 @@ loginForm.addEventListener('submit', async (e) => {
     const data = await res.json();
 
     if (data.success) {
-      authToken = data.token;
-      localStorage.setItem('torbox_admin_token', authToken);
-      showDashboard();
+      currentTempToken = data.tempToken;
+
+      if (data.require2FASetup) {
+        // Primera vez: mostrar configuración de 2FA
+        secretCodeDisplay.textContent = data.secret;
+        copySecretBtn.setAttribute('data-secret', data.secret);
+        loginSection.classList.add('hidden');
+        setup2FASection.classList.remove('hidden');
+        setup2FACodeInput.focus();
+      } else if (data.require2FA) {
+        // 2FA ya activo: pedir código
+        loginSection.classList.add('hidden');
+        verify2FASection.classList.remove('hidden');
+        verify2FACodeInput.focus();
+      }
     } else {
-      loginError.textContent = data.error || 'Contraseña incorrecta';
+      loginError.textContent = data.error || 'Credenciales no válidas';
     }
   } catch (err) {
-    loginError.textContent = 'Error al conectar con el servidor';
+    loginError.textContent = 'Error de conexión con el servidor protegido';
+  } finally {
+    loginBtn.disabled = false;
+    loginBtn.textContent = 'Continuar';
   }
 });
 
+// Copiar clave secreta 2FA al portapapeles
+copySecretBtn.addEventListener('click', () => {
+  const secret = copySecretBtn.getAttribute('data-secret');
+  if (secret) {
+    navigator.clipboard.writeText(secret);
+    copySecretBtn.textContent = '¡Clave Copiada! ✅';
+    setTimeout(() => {
+      copySecretBtn.textContent = '📋 Copiar Clave';
+    }, 2000);
+  }
+});
+
+// ----------------------------------------------------
+// PASO 2A: Confirmar Configuración Inicial de 2FA
+// ----------------------------------------------------
+setup2FAForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  setup2FAError.textContent = '';
+  verifySetupBtn.disabled = true;
+  verifySetupBtn.textContent = 'Validando Código...';
+
+  const code = setup2FACodeInput.value.trim();
+
+  try {
+    const res = await fetch('/admin/api/verify-2fa', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tempToken: currentTempToken, code })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      authToken = data.token;
+      localStorage.setItem('torbox_admin_session', authToken);
+      setup2FASection.classList.add('hidden');
+      showDashboard();
+    } else {
+      setup2FAError.textContent = data.error || 'Código incorrecto. Intenta con el nuevo código de tu app.';
+    }
+  } catch (err) {
+    setup2FAError.textContent = 'Error de conexión al verificar 2FA';
+  } finally {
+    verifySetupBtn.disabled = false;
+    verifySetupBtn.textContent = 'Vincular y Entrar';
+  }
+});
+
+// ----------------------------------------------------
+// PASO 2B: Verificar 2FA Habitual
+// ----------------------------------------------------
+verify2FAForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  verify2FAError.textContent = '';
+  verify2FABtn.disabled = true;
+  verify2FABtn.textContent = 'Verificando...';
+
+  const code = verify2FACodeInput.value.trim();
+
+  try {
+    const res = await fetch('/admin/api/verify-2fa', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tempToken: currentTempToken, code })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      authToken = data.token;
+      localStorage.setItem('torbox_admin_session', authToken);
+      verify2FASection.classList.add('hidden');
+      showDashboard();
+    } else {
+      verify2FAError.textContent = data.error || 'Código 2FA incorrecto';
+    }
+  } catch (err) {
+    verify2FAError.textContent = 'Error de conexión';
+  } finally {
+    verify2FABtn.disabled = false;
+    verify2FABtn.textContent = 'Verificar y Acceder';
+  }
+});
+
+// Volver al inicio desde 2FA
+backToLoginBtn.addEventListener('click', () => {
+  verify2FASection.classList.add('hidden');
+  setup2FASection.classList.add('hidden');
+  loginSection.classList.remove('hidden');
+  adminPasswordInput.value = '';
+  verify2FACodeInput.value = '';
+});
+
 // Cerrar sesión
-logoutBtn.addEventListener('click', () => {
+logoutBtn.addEventListener('click', async () => {
+  try {
+    await fetch('/admin/api/logout', {
+      method: 'POST',
+      headers: { 'Authorization': authToken }
+    });
+  } catch (e) {}
+
   authToken = '';
-  localStorage.removeItem('torbox_admin_token');
+  localStorage.removeItem('torbox_admin_session');
   dashboardSection.classList.add('hidden');
   loginSection.classList.remove('hidden');
   adminPasswordInput.value = '';
+  loginError.textContent = '';
 });
 
 refreshBtn.addEventListener('click', loadDashboardData);
 
 function showDashboard() {
   loginSection.classList.add('hidden');
+  setup2FASection.classList.add('hidden');
+  verify2FASection.classList.add('hidden');
   dashboardSection.classList.remove('hidden');
   loadDashboardData();
 }
 
-// Cargar métricas y usuarios
+// ----------------------------------------------------
+// Operaciones del Dashboard (Protegidas por Token Criptográfico)
+// ----------------------------------------------------
 async function loadDashboardData() {
   try {
     const res = await fetch('/admin/api/users', {
@@ -180,7 +323,6 @@ createUserForm.addEventListener('submit', async (e) => {
       createUserForm.reset();
       loadDashboardData();
 
-      // Mostrar modal con las credenciales listas para enviar
       credentialsMessage.value = data.welcomeMessage;
       credentialsModal.classList.remove('hidden');
     } else {
@@ -204,7 +346,7 @@ copyCredentialsBtn.addEventListener('click', () => {
   }, 2000);
 });
 
-// Modales de cierre genéricos
+// Modales de cierre
 document.querySelectorAll('[data-close]').forEach(btn => {
   btn.addEventListener('click', () => {
     const targetId = btn.getAttribute('data-close');
@@ -249,7 +391,7 @@ editUserForm.addEventListener('submit', async (e) => {
   }
 });
 
-// Pausar / Activar (Kill switch)
+// Pausar / Activar
 window.toggleUserStatus = async function(uuid) {
   try {
     await fetch(`/admin/api/users/${uuid}/toggle`, {
@@ -290,7 +432,7 @@ window.deleteUser = async function(uuid) {
   }
 };
 
-// Reconstruir y mostrar mensaje de bienvenida guardado
+// Mostrar credenciales guardadas
 window.showCredentialsForUser = async function(uuid) {
   try {
     const res = await fetch('/admin/api/users', { headers: { 'Authorization': authToken } });
