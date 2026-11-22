@@ -53,6 +53,13 @@ if (authToken) {
   showDashboard();
 }
 
+// Actualizar automáticamente las sesiones en vivo cada 4 segundos
+setInterval(() => {
+  if (authToken && dashboardSection && !dashboardSection.classList.contains('hidden')) {
+    loadDashboardData();
+  }
+}, 4000);
+
 // ----------------------------------------------------
 // PASO 1: Ingreso de Contraseña con Protección
 // ----------------------------------------------------
@@ -271,7 +278,7 @@ function renderUsers(users) {
       : `<span class="badge badge-indigo">1080p FHD</span>`;
 
     const liveSessionsPill = user.activeScreensNow > 0
-      ? `<span class="badge badge-success">${user.activeScreensNow} / ${user.maxScreens} en vivo</span>`
+      ? `<span class="badge badge-success">🟢 ${user.activeScreensNow} / ${user.maxScreens} en vivo</span>`
       : `<span style="color: var(--text-muted)">0 / ${user.maxScreens}</span>`;
 
     tr.innerHTML = `
