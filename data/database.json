@@ -1,5 +1,18 @@
 {
-  "users": [],
+  "users": [
+    {
+      "uuid": "545b0619-f147-489d-a846-a168eb9d5cc5",
+      "name": "cadenas",
+      "email": "gabriel9102002@gmail.com",
+      "password": "12410552",
+      "authKey": "BHMUc5hQceNjkB5N7euse_0zJtAJMTf4x_WnE6uAZL8=",
+      "maxScreens": 4,
+      "maxRes": "1080p",
+      "isActive": true,
+      "createdAt": "2026-11-22T20:26:45.247Z",
+      "updatedAt": "2026-11-22T20:26:45.247Z"
+    }
+  ],
   "settings": {
     "twoFactorSecret": "7WOKASTCPRYM4JK3QQS6SEUZ7SS44VN3",
     "twoFactorEnabled": true
