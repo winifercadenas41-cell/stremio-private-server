@@ -19,14 +19,12 @@ import {
 
 export const adminRouter = Router();
 
-// Tokens temporales de 5 minutos para el paso entre Contraseña y 2FA
 const pending2FATokens = new Map();
 
 function getClientIp(req) {
   return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
 }
 
-// Middleware de autenticación por Token Criptográfico de Sesión
 function authMiddleware(req, res, next) {
   const token = req.headers['authorization'] || req.headers['x-admin-token'] || req.query.token;
 
@@ -37,20 +35,17 @@ function authMiddleware(req, res, next) {
 }
 
 /**
- * PASO 1 DE LOGIN: Validar contraseña con Rate-Limit y Anti-Fuerza Bruta
+ * PASO 1 LOGIN: Contraseña con Rate-Limit
  */
 adminRouter.post('/login', (req, res) => {
   const clientIp = getClientIp(req);
 
-  // 1. Verificar si la IP está bloqueada por demasiados intentos
   const rateLimitCheck = checkRateLimit(clientIp);
   if (!rateLimitCheck.allowed) {
     return res.status(429).json({ success: false, error: rateLimitCheck.error });
   }
 
   const { password } = req.body;
-
-  // 2. Comparación segura contra ataques de tiempo
   const isPasswordValid = timingSafeCompare(password || '', config.adminPassword);
 
   if (!isPasswordValid) {
@@ -67,14 +62,11 @@ adminRouter.post('/login', (req, res) => {
     });
   }
 
-  // Contraseña correcta -> Resetear contador de fallos
   resetFailedAttempts(clientIp);
 
-  // 3. Crear token temporal de 5 minutos para el 2FA
   const tempToken = crypto.randomBytes(32).toString('hex');
   const settings = db.getSettings();
 
-  // Si no está configurado el 2FA aún, generamos el secreto para la vinculación inicial
   if (!settings.twoFactorEnabled) {
     const newSecret = generateBase32Secret(20);
     const otpauthUrl = `otpauth://totp/TorboxVIP:${encodeURIComponent(settings.adminUser || 'Admin')}?secret=${newSecret}&issuer=TorboxVIP`;
@@ -95,7 +87,6 @@ adminRouter.post('/login', (req, res) => {
     });
   }
 
-  // 2FA ya está activo: pedir el código de 6 dígitos
   pending2FATokens.set(tempToken, {
     ip: clientIp,
     expiresAt: Date.now() + 5 * 60 * 1000,
@@ -111,7 +102,7 @@ adminRouter.post('/login', (req, res) => {
 });
 
 /**
- * PASO 2 DE LOGIN: Validar código 2FA (TOTP de 6 dígitos)
+ * PASO 2 LOGIN: Validar código 2FA
  */
 adminRouter.post('/verify-2fa', (req, res) => {
   const clientIp = getClientIp(req);
@@ -120,30 +111,25 @@ adminRouter.post('/verify-2fa', (req, res) => {
   const pending = pending2FATokens.get(tempToken);
   if (!pending || pending.expiresAt < Date.now()) {
     pending2FATokens.delete(tempToken);
-    return res.status(401).json({ success: false, error: 'La sesión temporal ha expirado. Ingresa la contraseña de nuevo.' });
+    return res.status(401).json({ success: false, error: 'Sesión temporal expirada. Ingresa la contraseña de nuevo.' });
   }
 
-  // Validar código TOTP contra el secreto
   const secretToVerify = pending.isSetup ? pending.setupSecret : pending.secret;
   const isCodeValid = verifyTOTP(code, secretToVerify);
 
   if (!isCodeValid) {
-    return res.status(401).json({ success: false, error: 'Código de 6 dígitos incorrecto o expirado. Revisa tu app de autenticación.' });
+    return res.status(401).json({ success: false, error: 'Código 2FA incorrecto o expirado.' });
   }
 
-  // Si fue configuración inicial de 2FA, guardamos el secreto permanentemente
   if (pending.isSetup) {
     db.updateSettings({
       twoFactorSecret: pending.setupSecret,
       twoFactorEnabled: true
     });
-    console.log('[Seguridad] 2FA activado y verificado por primera vez.');
+    console.log('[Seguridad] 2FA activado y verificado.');
   }
 
-  // Eliminar token temporal
   pending2FATokens.delete(tempToken);
-
-  // Crear token de sesión criptográfico firmado válido por 8 horas
   const sessionToken = createSessionToken(clientIp);
 
   return res.json({
@@ -152,9 +138,6 @@ adminRouter.post('/verify-2fa', (req, res) => {
   });
 });
 
-/**
- * Cerrar sesión (revocar token criptográfico)
- */
 adminRouter.post('/logout', (req, res) => {
   const token = req.headers['authorization'] || req.headers['x-admin-token'];
   revokeSessionToken(token);
@@ -162,7 +145,7 @@ adminRouter.post('/logout', (req, res) => {
 });
 
 /**
- * Obtener estadísticas y lista de usuarios con sus sesiones activas
+ * Obtener estadísticas y lista de usuarios
  */
 adminRouter.get('/users', authMiddleware, (req, res) => {
   const users = db.getUsers().map(user => ({
@@ -182,10 +165,20 @@ adminRouter.get('/users', authMiddleware, (req, res) => {
 });
 
 /**
- * Creación automática de usuario en Stremio con inyección de Addons (1 Clic)
+ * Creación de usuario con Filtros Avanzados
  */
 adminRouter.post('/users', authMiddleware, async (req, res) => {
-  const { name, email, password, maxScreens, maxRes } = req.body;
+  const {
+    name,
+    email,
+    password,
+    maxScreens,
+    maxRes,
+    maxFileSizeGb,
+    excludeCam,
+    blockDolbyVision,
+    audioLang
+  } = req.body;
 
   const randomSuffix = Math.random().toString(36).substring(2, 7);
   const finalEmail = (email && email.trim()) || `vip_${randomSuffix}@torboxstream.com`;
@@ -194,12 +187,12 @@ adminRouter.post('/users', authMiddleware, async (req, res) => {
   const finalRes = maxRes === '4k' ? '4k' : '1080p';
   const newUuid = uuidv4();
 
-  console.log(`[Admin] Creando cuenta automática para: ${finalEmail} (${finalRes}, ${finalScreens} pantallas)`);
+  console.log(`[Admin] Creando cuenta para: ${finalEmail} (${finalRes}, ${finalScreens} pantallas, max ${maxFileSizeGb}GB)`);
 
   const registerResult = await registerStremioAccount(finalEmail, finalPassword);
   if (!registerResult.success) {
     return res.status(500).json({
-      error: `Error al crear la cuenta en Stremio: ${registerResult.error}`
+      error: `Error al conectar con Stremio: ${registerResult.error}`
     });
   }
 
@@ -210,7 +203,11 @@ adminRouter.post('/users', authMiddleware, async (req, res) => {
     password: finalPassword,
     authKey: registerResult.authKey,
     maxScreens: finalScreens,
-    maxRes: finalRes
+    maxRes: finalRes,
+    maxFileSizeGb: maxFileSizeGb !== undefined ? parseFloat(maxFileSizeGb) : (finalRes === '4k' ? 0 : 8),
+    excludeCam: excludeCam !== undefined ? Boolean(excludeCam) : true,
+    blockDolbyVision: Boolean(blockDolbyVision),
+    audioLang: audioLang || 'all'
   });
 
   let addonSetupSuccess = false;
@@ -226,7 +223,7 @@ adminRouter.post('/users', authMiddleware, async (req, res) => {
     `📺 *Pantallas permitidas:* ${finalScreens} simultánea(s)\n` +
     `✨ *Calidad de imagen:* ${qualityText}\n\n` +
     `*Instrucciones de uso en tu TV o Móvil:*\n` +
-    `1. Descarga e instala la app oficial de *Stremio* en tu Smart TV (Samsung, LG, Google TV, Fire TV) o teléfono.\n` +
+    `1. Descarga e instala la app oficial de *Stremio* en tu Smart TV o teléfono.\n` +
     `2. Inicia sesión con el correo y contraseña indicados arriba.\n` +
     `3. ¡Listo! Todas las películas, series y tendencias ya están preconfiguradas.`;
 
@@ -239,13 +236,30 @@ adminRouter.post('/users', authMiddleware, async (req, res) => {
 });
 
 /**
- * Modificar plan en caliente (pantallas y resolución)
+ * Modificar plan y filtros avanzados
  */
 adminRouter.put('/users/:uuid', authMiddleware, async (req, res) => {
   const { uuid } = req.params;
-  const { name, maxScreens, maxRes } = req.body;
+  const {
+    name,
+    maxScreens,
+    maxRes,
+    maxFileSizeGb,
+    excludeCam,
+    blockDolbyVision,
+    audioLang
+  } = req.body;
 
-  const updatedUser = db.updateUser(uuid, { name, maxScreens, maxRes });
+  const updatedUser = db.updateUser(uuid, {
+    name,
+    maxScreens,
+    maxRes,
+    maxFileSizeGb,
+    excludeCam,
+    blockDolbyVision,
+    audioLang
+  });
+
   if (!updatedUser) {
     return res.status(404).json({ error: 'Usuario no encontrado' });
   }
@@ -258,7 +272,7 @@ adminRouter.put('/users/:uuid', authMiddleware, async (req, res) => {
 });
 
 /**
- * Pausar o Reactivar cuenta (Kill Switch)
+ * Pausar o Reactivar cuenta
  */
 adminRouter.post('/users/:uuid/toggle', authMiddleware, (req, res) => {
   const { uuid } = req.params;
@@ -292,7 +306,7 @@ adminRouter.delete('/users/:uuid', authMiddleware, (req, res) => {
 });
 
 /**
- * Endpoint de automatización (Webhook / Bot / Pasarela de pago)
+ * Endpoint de automatización (Webhook / Bot / Upgrade)
  */
 adminRouter.post('/upgrade', (req, res) => {
   const token = req.headers['authorization'] || req.headers['x-admin-token'] || req.query.token;
@@ -300,7 +314,7 @@ adminRouter.post('/upgrade', (req, res) => {
     return res.status(401).json({ error: 'No autorizado para webhook' });
   }
 
-  const { email, uuid, maxScreens, maxRes } = req.body;
+  const { email, uuid, maxScreens, maxRes, maxFileSizeGb } = req.body;
   const targetUser = uuid ? db.getUserByUuid(uuid) : db.getUserByEmail(email);
   if (!targetUser) {
     return res.status(404).json({ error: 'Usuario no encontrado para upgrade' });
@@ -308,7 +322,8 @@ adminRouter.post('/upgrade', (req, res) => {
 
   const updated = db.updateUser(targetUser.uuid, {
     maxScreens: maxScreens !== undefined ? maxScreens : targetUser.maxScreens,
-    maxRes: maxRes !== undefined ? maxRes : '4k'
+    maxRes: maxRes !== undefined ? maxRes : '4k',
+    maxFileSizeGb: maxFileSizeGb !== undefined ? maxFileSizeGb : 0
   });
 
   return res.json({

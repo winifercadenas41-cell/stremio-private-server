@@ -58,9 +58,6 @@ class Database {
     this.scheduleGitHubSync();
   }
 
-  // ----------------------------------------------------
-  // PERSISTENCIA EN GITHUB (Gratis y Permanente)
-  // ----------------------------------------------------
   async syncFromGitHub() {
     if (!config.githubToken || !config.githubRepo) return;
 
@@ -81,14 +78,13 @@ class Database {
         const parsed = JSON.parse(decoded);
 
         if (Array.isArray(parsed.users) && parsed.users.length > 0) {
-          // Si GitHub tiene más datos o los datos remotos, fusionar
           this.data = parsed;
           this.saveLocally();
-          console.log(`[DB] ☁️ Base de datos restaurada desde GitHub con éxito (${parsed.users.length} usuarios).`);
+          console.log(`[DB] ☁️ Base de datos restaurada desde GitHub (${parsed.users.length} usuarios).`);
         }
       }
     } catch (err) {
-      console.log('[DB] Nota: No se pudo leer backup de GitHub (se usará local):', err.message);
+      console.log('[DB] Nota backup GitHub:', err.message);
     }
   }
 
@@ -98,7 +94,7 @@ class Database {
     clearTimeout(this.syncTimeout);
     this.syncTimeout = setTimeout(() => {
       this.syncToGitHub().catch(() => {});
-    }, 2500); // 2.5s debounce
+    }, 2000);
   }
 
   async syncToGitHub() {
@@ -108,7 +104,6 @@ class Database {
       const url = `https://api.github.com/repos/${config.githubRepo}/contents/data/database.json`;
       const contentBase64 = Buffer.from(JSON.stringify(this.data, null, 2)).toString('base64');
 
-      // Obtener el SHA actual si no lo tenemos
       if (!this.gitSha) {
         const getRes = await fetch(url, {
           headers: {
@@ -141,16 +136,13 @@ class Database {
       if (putRes.ok) {
         const putData = await putRes.json();
         this.gitSha = putData.content?.sha || null;
-        console.log('[DB] ☁️ Backup de base de datos sincronizado en GitHub con éxito.');
+        console.log('[DB] ☁️ Backup en GitHub actualizado.');
       }
     } catch (err) {
-      console.error('[DB] Error sincronizando backup en GitHub:', err.message);
+      console.error('[DB] Error backup en GitHub:', err.message);
     }
   }
 
-  // ----------------------------------------------------
-  // MÉTODOS CRUD DE USUARIOS
-  // ----------------------------------------------------
   getUsers() {
     return this.data.users;
   }
@@ -172,6 +164,11 @@ class Database {
       authKey: userData.authKey || '',
       maxScreens: parseInt(userData.maxScreens || 4, 10),
       maxRes: userData.maxRes === '4k' ? '4k' : '1080p',
+      // Filtros avanzados
+      maxFileSizeGb: userData.maxFileSizeGb !== undefined ? parseFloat(userData.maxFileSizeGb) : (userData.maxRes === '4k' ? 0 : 8),
+      excludeCam: userData.excludeCam !== undefined ? Boolean(userData.excludeCam) : true,
+      blockDolbyVision: userData.blockDolbyVision !== undefined ? Boolean(userData.blockDolbyVision) : false,
+      audioLang: userData.audioLang || 'all',
       isActive: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -188,6 +185,10 @@ class Database {
     if (fields.name !== undefined) user.name = fields.name;
     if (fields.maxScreens !== undefined) user.maxScreens = parseInt(fields.maxScreens, 10);
     if (fields.maxRes !== undefined) user.maxRes = fields.maxRes === '4k' ? '4k' : '1080p';
+    if (fields.maxFileSizeGb !== undefined) user.maxFileSizeGb = parseFloat(fields.maxFileSizeGb);
+    if (fields.excludeCam !== undefined) user.excludeCam = Boolean(fields.excludeCam);
+    if (fields.blockDolbyVision !== undefined) user.blockDolbyVision = Boolean(fields.blockDolbyVision);
+    if (fields.audioLang !== undefined) user.audioLang = fields.audioLang;
     if (fields.isActive !== undefined) user.isActive = Boolean(fields.isActive);
     if (fields.authKey !== undefined) user.authKey = fields.authKey;
 

@@ -31,7 +31,6 @@
       <h2>Escanea el Código QR</h2>
       <p class="subtitle">Abre <strong>Google Authenticator</strong> en tu móvil y escanea este código con tu cámara:</p>
       
-      <!-- Contenedor del Código QR -->
       <div class="qr-container">
         <img id="qrCodeImg" src="" alt="Código QR 2FA" class="qr-image">
       </div>
@@ -120,7 +119,7 @@
           <tr>
             <th>Estado</th>
             <th>Cliente / Correo</th>
-            <th>Resolución</th>
+            <th>Plan & Filtros</th>
             <th>Pantallas</th>
             <th>Sesiones en Vivo</th>
             <th>Acciones</th>
@@ -133,9 +132,9 @@
     </div>
   </div>
 
-  <!-- Modal Crear Cuenta -->
+  <!-- Modal Crear Cuenta con Filtros Avanzados -->
   <div id="createModal" class="modal-overlay hidden">
-    <div class="modal-card">
+    <div class="modal-card" style="max-width: 580px;">
       <div class="modal-header">
         <h3>Crear Cuenta de Stremio</h3>
         <button class="close-modal-btn" data-close="createModal">&times;</button>
@@ -145,13 +144,15 @@
           <label>Nombre del Cliente</label>
           <input type="text" id="newUserName" placeholder="Ej: Familia Gómez" required>
         </div>
-        <div class="form-group">
-          <label>Correo Electrónico (opcional - dejar vacío para autogenerar)</label>
-          <input type="email" id="newUserEmail" placeholder="gomez@stremio.com">
-        </div>
-        <div class="form-group">
-          <label>Contraseña (opcional - dejar vacío para autogenerar)</label>
-          <input type="text" id="newUserPassword" placeholder="Generar automáticamente">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Correo Electrónico (opcional)</label>
+            <input type="email" id="newUserEmail" placeholder="Dejar vacío para autogenerar">
+          </div>
+          <div class="form-group">
+            <label>Contraseña (opcional)</label>
+            <input type="text" id="newUserPassword" placeholder="Dejar vacío para autogenerar">
+          </div>
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -171,6 +172,41 @@
             </select>
           </div>
         </div>
+
+        <!-- SECCIÓN DE FILTROS AVANZADOS DE ENLACES -->
+        <div class="advanced-filters-box">
+          <div class="filters-header">⚙️ Filtros Avanzados de Enlaces</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Tamaño Máximo por Archivo</label>
+              <select id="newUserMaxFileSize">
+                <option value="4">Máx. 4 GB (Conexiones básicas)</option>
+                <option value="8" selected>Máx. 8 GB (Recomendado 1080p)</option>
+                <option value="15">Máx. 15 GB (Alta calidad)</option>
+                <option value="0">Sin límite (Remux 4K)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Prioridad de Idioma</label>
+              <select id="newUserAudioLang">
+                <option value="all" selected>Todos los idiomas</option>
+                <option value="latino">Priorizar Español Latino</option>
+                <option value="castellano">Priorizar Castellano</option>
+              </select>
+            </div>
+          </div>
+          <div class="checkbox-row">
+            <label class="checkbox-label">
+              <input type="checkbox" id="newUserExcludeCam" checked>
+              <span>Excluir grabaciones de cine (CAM / TeleSync / Screener)</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="newUserBlockDV">
+              <span>Bloquear Dolby Vision (para TVs que se ven moradas/verdes)</span>
+            </label>
+          </div>
+        </div>
+
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" data-close="createModal">Cancelar</button>
           <button type="submit" id="submitCreateBtn" class="btn btn-primary">Crear Cuenta Automática</button>
@@ -179,9 +215,9 @@
     </div>
   </div>
 
-  <!-- Modal Editar Plan -->
+  <!-- Modal Editar Plan con Filtros Avanzados -->
   <div id="editModal" class="modal-overlay hidden">
-    <div class="modal-card">
+    <div class="modal-card" style="max-width: 580px;">
       <div class="modal-header">
         <h3>Editar Plan del Cliente</h3>
         <button class="close-modal-btn" data-close="editModal">&times;</button>
@@ -189,7 +225,7 @@
       <form id="editUserForm">
         <input type="hidden" id="editUserUuid">
         <div class="form-group">
-          <label>Nombre</label>
+          <label>Nombre del Cliente</label>
           <input type="text" id="editUserName" required>
         </div>
         <div class="form-row">
@@ -210,6 +246,41 @@
             </select>
           </div>
         </div>
+
+        <!-- SECCIÓN DE FILTROS AVANZADOS EN EDICIÓN -->
+        <div class="advanced-filters-box">
+          <div class="filters-header">⚙️ Filtros Avanzados de Enlaces</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Tamaño Máximo por Archivo</label>
+              <select id="editUserMaxFileSize">
+                <option value="4">Máx. 4 GB (Conexiones básicas)</option>
+                <option value="8">Máx. 8 GB (Recomendado 1080p)</option>
+                <option value="15">Máx. 15 GB (Alta calidad)</option>
+                <option value="0">Sin límite (Remux 4K)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Prioridad de Idioma</label>
+              <select id="editUserAudioLang">
+                <option value="all">Todos los idiomas</option>
+                <option value="latino">Priorizar Español Latino</option>
+                <option value="castellano">Priorizar Castellano</option>
+              </select>
+            </div>
+          </div>
+          <div class="checkbox-row">
+            <label class="checkbox-label">
+              <input type="checkbox" id="editUserExcludeCam">
+              <span>Excluir grabaciones de cine (CAM / TeleSync / Screener)</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="editUserBlockDV">
+              <span>Bloquear Dolby Vision (para TVs que se ven moradas/verdes)</span>
+            </label>
+          </div>
+        </div>
+
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" data-close="editModal">Cancelar</button>
           <button type="submit" class="btn btn-primary">Guardar Cambios</button>

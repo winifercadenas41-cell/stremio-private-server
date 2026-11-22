@@ -53,7 +53,7 @@ if (authToken) {
   showDashboard();
 }
 
-// Actualizar automáticamente las sesiones en vivo cada 4 segundos
+// Auto-refrescar sesiones cada 4 segundos
 setInterval(() => {
   if (authToken && dashboardSection && !dashboardSection.classList.contains('hidden')) {
     loadDashboardData();
@@ -83,7 +83,6 @@ loginForm.addEventListener('submit', async (e) => {
       currentTempToken = data.tempToken;
 
       if (data.require2FASetup) {
-        // Primera vez: mostrar Código QR y clave
         secretCodeDisplay.textContent = data.secret;
         copySecretBtn.setAttribute('data-secret', data.secret);
         
@@ -95,7 +94,6 @@ loginForm.addEventListener('submit', async (e) => {
         setup2FASection.classList.remove('hidden');
         setup2FACodeInput.focus();
       } else if (data.require2FA) {
-        // 2FA ya activo: pedir código
         loginSection.classList.add('hidden');
         verify2FASection.classList.remove('hidden');
         verify2FACodeInput.focus();
@@ -111,7 +109,6 @@ loginForm.addEventListener('submit', async (e) => {
   }
 });
 
-// Copiar clave secreta 2FA al portapapeles
 copySecretBtn.addEventListener('click', () => {
   const secret = copySecretBtn.getAttribute('data-secret');
   if (secret) {
@@ -193,7 +190,6 @@ verify2FAForm.addEventListener('submit', async (e) => {
   }
 });
 
-// Volver al inicio desde 2FA
 backToLoginBtn.addEventListener('click', () => {
   verify2FASection.classList.add('hidden');
   setup2FASection.classList.add('hidden');
@@ -202,7 +198,6 @@ backToLoginBtn.addEventListener('click', () => {
   verify2FACodeInput.value = '';
 });
 
-// Cerrar sesión
 logoutBtn.addEventListener('click', async () => {
   try {
     await fetch('/admin/api/logout', {
@@ -230,7 +225,7 @@ function showDashboard() {
 }
 
 // ----------------------------------------------------
-// Operaciones del Dashboard (Protegidas por Token Criptográfico)
+// Dashboard y Gestión de Usuarios
 // ----------------------------------------------------
 async function loadDashboardData() {
   try {
@@ -274,8 +269,12 @@ function renderUsers(users) {
       : `<span class="badge badge-danger">Pausado</span>`;
 
     const resBadge = user.maxRes === '4k'
-      ? `<span class="badge badge-warning">4K Ultra HD</span>`
+      ? `<span class="badge badge-warning">4K UHD</span>`
       : `<span class="badge badge-indigo">1080p FHD</span>`;
+
+    const sizeText = user.maxFileSizeGb && user.maxFileSizeGb > 0
+      ? `Máx ${user.maxFileSizeGb}GB`
+      : 'Sin límite';
 
     const liveSessionsPill = user.activeScreensNow > 0
       ? `<span class="badge badge-success">🟢 ${user.activeScreensNow} / ${user.maxScreens} en vivo</span>`
@@ -287,12 +286,19 @@ function renderUsers(users) {
         <strong>${user.name}</strong><br>
         <small style="color: var(--text-muted);">${user.email}</small>
       </td>
-      <td>${resBadge}</td>
+      <td>
+        ${resBadge} <small style="color: var(--text-muted); margin-left: 0.3rem;">${sizeText}</small><br>
+        <small style="color: var(--text-muted); font-size: 0.72rem;">
+          ${user.excludeCam !== false ? '🚫 Sin CAM' : '⚠️ Con CAM'} · 
+          ${user.blockDolbyVision ? '🚫 Sin DV' : '🌈 DV Ok'} · 
+          ${user.audioLang === 'latino' ? '🇲🇽 Latino' : (user.audioLang === 'castellano' ? '🇪🇸 Castellano' : '🌐 Todos')}
+        </small>
+      </td>
       <td><strong>${user.maxScreens}</strong> pantalla(s)</td>
       <td>${liveSessionsPill}</td>
       <td>
         <div class="action-buttons">
-          <button class="btn btn-secondary btn-sm" onclick="openEditModal('${user.uuid}', '${user.name}', '${user.maxRes}', ${user.maxScreens})">✏️ Editar</button>
+          <button class="btn btn-secondary btn-sm" onclick="openEditModal('${user.uuid}')">✏️ Editar</button>
           <button class="btn btn-secondary btn-sm" onclick="toggleUserStatus('${user.uuid}')">${user.isActive ? '⏸️ Pausar' : '▶️ Activar'}</button>
           <button class="btn btn-secondary btn-sm" onclick="resetSessions('${user.uuid}')" title="Liberar pantallas">🔄 Reset</button>
           <button class="btn btn-secondary btn-sm" onclick="showCredentialsForUser('${user.uuid}')" title="Copiar mensaje">📋 Mensaje</button>
@@ -304,7 +310,7 @@ function renderUsers(users) {
   });
 }
 
-// Crear cuenta automática
+// Crear cuenta con Filtros Avanzados
 openCreateModalBtn.addEventListener('click', () => {
   createModal.classList.remove('hidden');
 });
@@ -320,6 +326,12 @@ createUserForm.addEventListener('submit', async (e) => {
   const maxRes = document.getElementById('newUserRes').value;
   const maxScreens = document.getElementById('newUserScreens').value;
 
+  // Nuevos filtros avanzados
+  const maxFileSizeGb = document.getElementById('newUserMaxFileSize').value;
+  const audioLang = document.getElementById('newUserAudioLang').value;
+  const excludeCam = document.getElementById('newUserExcludeCam').checked;
+  const blockDolbyVision = document.getElementById('newUserBlockDV').checked;
+
   try {
     const res = await fetch('/admin/api/users', {
       method: 'POST',
@@ -327,7 +339,17 @@ createUserForm.addEventListener('submit', async (e) => {
         'Content-Type': 'application/json',
         'Authorization': authToken
       },
-      body: JSON.stringify({ name, email, password, maxRes, maxScreens })
+      body: JSON.stringify({
+        name,
+        email,
+        password,
+        maxRes,
+        maxScreens,
+        maxFileSizeGb,
+        audioLang,
+        excludeCam,
+        blockDolbyVision
+      })
     });
 
     const data = await res.json();
@@ -367,13 +389,28 @@ document.querySelectorAll('[data-close]').forEach(btn => {
   });
 });
 
-// Editar Plan
-window.openEditModal = function(uuid, name, maxRes, maxScreens) {
-  document.getElementById('editUserUuid').value = uuid;
-  document.getElementById('editUserName').value = name;
-  document.getElementById('editUserRes').value = maxRes;
-  document.getElementById('editUserScreens').value = maxScreens;
-  editModal.classList.remove('hidden');
+// Editar Plan con Filtros Avanzados
+window.openEditModal = async function(uuid) {
+  try {
+    const res = await fetch('/admin/api/users', { headers: { 'Authorization': authToken } });
+    const data = await res.json();
+    const user = data.users.find(u => u.uuid === uuid);
+    if (!user) return;
+
+    document.getElementById('editUserUuid').value = user.uuid;
+    document.getElementById('editUserName').value = user.name;
+    document.getElementById('editUserRes').value = user.maxRes;
+    document.getElementById('editUserScreens').value = user.maxScreens;
+
+    document.getElementById('editUserMaxFileSize').value = user.maxFileSizeGb !== undefined ? user.maxFileSizeGb : (user.maxRes === '4k' ? '0' : '8');
+    document.getElementById('editUserAudioLang').value = user.audioLang || 'all';
+    document.getElementById('editUserExcludeCam').checked = user.excludeCam !== false;
+    document.getElementById('editUserBlockDV').checked = Boolean(user.blockDolbyVision);
+
+    editModal.classList.remove('hidden');
+  } catch (err) {
+    alert('Error al cargar datos del usuario');
+  }
 };
 
 editUserForm.addEventListener('submit', async (e) => {
@@ -383,6 +420,11 @@ editUserForm.addEventListener('submit', async (e) => {
   const maxRes = document.getElementById('editUserRes').value;
   const maxScreens = document.getElementById('editUserScreens').value;
 
+  const maxFileSizeGb = document.getElementById('editUserMaxFileSize').value;
+  const audioLang = document.getElementById('editUserAudioLang').value;
+  const excludeCam = document.getElementById('editUserExcludeCam').checked;
+  const blockDolbyVision = document.getElementById('editUserBlockDV').checked;
+
   try {
     const res = await fetch(`/admin/api/users/${uuid}`, {
       method: 'PUT',
@@ -390,7 +432,15 @@ editUserForm.addEventListener('submit', async (e) => {
         'Content-Type': 'application/json',
         'Authorization': authToken
       },
-      body: JSON.stringify({ name, maxRes, maxScreens })
+      body: JSON.stringify({
+        name,
+        maxRes,
+        maxScreens,
+        maxFileSizeGb,
+        audioLang,
+        excludeCam,
+        blockDolbyVision
+      })
     });
     const data = await res.json();
     if (data.success) {
@@ -460,7 +510,7 @@ window.showCredentialsForUser = async function(uuid) {
       `📺 *Pantallas permitidas:* ${user.maxScreens} simultánea(s)\n` +
       `✨ *Calidad de imagen:* ${qualityText}\n\n` +
       `*Instrucciones de uso en tu TV o Móvil:*\n` +
-      `1. Descarga e instala la app oficial de *Stremio* en tu Smart TV (Samsung, LG, Google TV, Fire TV) o teléfono.\n` +
+      `1. Descarga e instala la app oficial de *Stremio* en tu Smart TV o teléfono.\n` +
       `2. Inicia sesión con el correo y contraseña indicados arriba.\n` +
       `3. ¡Listo! Todas las películas, series y tendencias ya están preconfiguradas.`;
 

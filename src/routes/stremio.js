@@ -44,7 +44,7 @@ stremioRouter.get('/:uuid/manifest.json', (req, res) => {
 });
 
 /**
- * Lista de Streams: Genera los enlaces apuntando a la ruta de Playback de tu servidor
+ * Lista de Streams: Genera los enlaces con filtros avanzados
  */
 stremioRouter.get('/:uuid/stream/:type/:id.json', async (req, res) => {
   const { uuid, type, id } = req.params;
@@ -61,9 +61,18 @@ stremioRouter.get('/:uuid/stream/:type/:id.json', async (req, res) => {
   }
 
   try {
-    const rawStreams = await getStreamsForMedia(type, id, user.maxRes);
+    // Pasar todos los filtros personalizados de este usuario
+    const filters = {
+      maxRes: user.maxRes,
+      maxFileSizeGb: user.maxFileSizeGb,
+      excludeCam: user.excludeCam,
+      blockDolbyVision: user.blockDolbyVision,
+      audioLang: user.audioLang
+    };
 
-    // Envolvemos cada stream para que apunte al interceptor de Playback de tu servidor
+    const rawStreams = await getStreamsForMedia(type, id, filters);
+
+    // Envolvemos cada stream para el interceptor de Playback 302
     const wrappedStreams = rawStreams.map(stream => {
       if (!stream.url) return stream;
 
@@ -84,10 +93,7 @@ stremioRouter.get('/:uuid/stream/:type/:id.json', async (req, res) => {
 });
 
 /**
- * INTERCEPTOR DE PLAYBACK (El momento exacto del Play)
- * 1. Suma la sesión activa en el contador.
- * 2. Valida que no exceda las pantallas permitidas.
- * 3. Redirige (302) al enlace real de Torbox para reproducir a máxima velocidad.
+ * Interceptor de Playback 302 (Contador de pantallas en tiempo real)
  */
 stremioRouter.get('/:uuid/playback/:token', (req, res) => {
   const { uuid, token } = req.params;
@@ -96,13 +102,11 @@ stremioRouter.get('/:uuid/playback/:token', (req, res) => {
 
   const user = db.getUserByUuid(uuid);
 
-  // 1. Validar que la cuenta exista y no esté pausada
   if (!user || user.isActive === false) {
     console.warn(`[Playback] Acceso denegado: Usuario ${uuid} no existe o está pausado.`);
     return res.redirect(302, config.warningVideoUrl);
   }
 
-  // 2. Validar límite de pantallas simultáneas en tiempo real
   const concurrencyResult = concurrencyService.checkAndRegister(
     uuid,
     clientIp,
@@ -111,18 +115,17 @@ stremioRouter.get('/:uuid/playback/:token', (req, res) => {
   );
 
   if (!concurrencyResult.allowed) {
-    console.warn(`[Playback] ⚠️ Límite de ${user.maxScreens} pantallas alcanzado para ${user.name}. Bloqueando intento.`);
+    console.warn(`[Playback] ⚠️ Límite de ${user.maxScreens} pantallas alcanzado para ${user.name}. Bloqueando.`);
     return res.redirect(302, config.warningVideoUrl);
   }
 
-  console.log(`[Playback] ▶️ ¡PLAY INICIADO! Cliente: ${user.name} | Pantallas activas: ${concurrencyResult.currentScreens}/${user.maxScreens}`);
+  console.log(`[Playback] ▶️ ¡PLAY! Cliente: ${user.name} | Pantallas activas: ${concurrencyResult.currentScreens}/${user.maxScreens}`);
 
-  // 3. Decodificar la URL real de Torbox y redirigir al reproductor
   try {
     const targetUrl = Buffer.from(token, 'base64url').toString('utf-8');
     return res.redirect(302, targetUrl);
   } catch (e) {
-    console.error('[Playback] Error al decodificar la URL del stream:', e);
+    console.error('[Playback] Error decodificando URL del stream:', e);
     return res.redirect(302, config.warningVideoUrl);
   }
 });
