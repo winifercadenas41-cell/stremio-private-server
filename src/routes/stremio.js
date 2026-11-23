@@ -68,7 +68,8 @@ stremioRouter.get('/:uuid/stream/:type/:id.json', async (req, res) => {
       maxFileSizeGb: user.maxFileSizeGb,
       excludeCam: user.excludeCam,
       blockDolbyVision: user.blockDolbyVision,
-      audioLang: user.audioLang
+      audioLang: user.audioLang || 'latino',
+      onlyCached: user.onlyCached
     };
 
     const rawStreams = await getStreamsForMedia(type, id, filters);

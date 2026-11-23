@@ -302,9 +302,10 @@ function renderUsers(users) {
       <td>
         ${resBadge} <small style="color: var(--text-muted); margin-left: 0.3rem;">${sizeText}</small><br>
         <small style="color: var(--text-muted); font-size: 0.72rem;">
+          ${user.onlyCached ? '⚡ Solo Caché' : '⚡ Caché + ⏳ Descargas'} · 
           ${user.excludeCam !== false ? '🚫 Sin CAM' : '⚠️ Con CAM'} · 
           ${user.blockDolbyVision ? '🚫 Sin DV' : '🌈 DV Ok'} · 
-          ${user.audioLang === 'latino' ? '🇲🇽 Latino' : (user.audioLang === 'castellano' ? '🇪🇸 Castellano' : '🌐 Todos')}
+          ${user.audioLang === 'latino' || !user.audioLang ? '🇲🇽 Latino' : (user.audioLang === 'castellano' ? '🇪🇸 Castellano' : '🌐 Todos')}
         </small>
       </td>
       <td><strong>${user.maxScreens}</strong> pantalla(s)</td>
@@ -342,6 +343,7 @@ createUserForm.addEventListener('submit', async (e) => {
   // Nuevos filtros avanzados
   const maxFileSizeGb = document.getElementById('newUserMaxFileSize').value;
   const audioLang = document.getElementById('newUserAudioLang').value;
+  const onlyCached = document.getElementById('newUserOnlyCached').checked;
   const excludeCam = document.getElementById('newUserExcludeCam').checked;
   const blockDolbyVision = document.getElementById('newUserBlockDV').checked;
 
@@ -360,6 +362,7 @@ createUserForm.addEventListener('submit', async (e) => {
         maxScreens,
         maxFileSizeGb,
         audioLang,
+        onlyCached,
         excludeCam,
         blockDolbyVision
       })
@@ -419,7 +422,8 @@ window.openEditModal = async function(uuid) {
     document.getElementById('editUserScreens').value = user.maxScreens;
 
     document.getElementById('editUserMaxFileSize').value = user.maxFileSizeGb !== undefined ? user.maxFileSizeGb : (user.maxRes === '4k' ? '0' : '8');
-    document.getElementById('editUserAudioLang').value = user.audioLang || 'all';
+    document.getElementById('editUserAudioLang').value = user.audioLang || 'latino';
+    document.getElementById('editUserOnlyCached').checked = Boolean(user.onlyCached);
     document.getElementById('editUserExcludeCam').checked = user.excludeCam !== false;
     document.getElementById('editUserBlockDV').checked = Boolean(user.blockDolbyVision);
 
@@ -438,6 +442,7 @@ editUserForm.addEventListener('submit', async (e) => {
 
   const maxFileSizeGb = document.getElementById('editUserMaxFileSize').value;
   const audioLang = document.getElementById('editUserAudioLang').value;
+  const onlyCached = document.getElementById('editUserOnlyCached').checked;
   const excludeCam = document.getElementById('editUserExcludeCam').checked;
   const blockDolbyVision = document.getElementById('editUserBlockDV').checked;
 
@@ -454,6 +459,7 @@ editUserForm.addEventListener('submit', async (e) => {
         maxScreens,
         maxFileSizeGb,
         audioLang,
+        onlyCached,
         excludeCam,
         blockDolbyVision
       })

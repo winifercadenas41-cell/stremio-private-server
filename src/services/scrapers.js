@@ -16,7 +16,8 @@ export async function getStreamsForMedia(type, id, filters = {}) {
   const maxFileSizeGb = parseFloat(filters.maxFileSizeGb !== undefined ? filters.maxFileSizeGb : (maxRes === '4k' ? 0 : 8));
   const excludeCam = filters.excludeCam !== false; // default true
   const blockDolbyVision = Boolean(filters.blockDolbyVision);
-  const audioLang = filters.audioLang || 'all';
+  const audioLang = filters.audioLang || 'latino';
+  const onlyCached = Boolean(filters.onlyCached);
 
   const streams = [];
 
@@ -50,6 +51,11 @@ export async function getStreamsForMedia(type, id, filters = {}) {
   for (const stream of streams) {
     const parsed = parseTorrentMetadata(stream, maxRes);
     const fullText = `${stream.name || ''} ${stream.title || ''} ${stream.behaviorHints?.filename || ''}`.toLowerCase();
+
+    // Filtro 0: Excluir enlaces sin caché si el filtro onlyCached está activo
+    if (onlyCached && !parsed.isCached) {
+      continue;
+    }
 
     // Filtro 1: Excluir grabaciones de cine (CAM, TS, Telesync, HDCAM, Screener)
     if (excludeCam) {
@@ -90,62 +96,62 @@ export async function getStreamsForMedia(type, id, filters = {}) {
     let scoreA = 0;
     let scoreB = 0;
 
-    // Prioridad por Idioma
-    if (audioLang === 'latino') {
-      if (pA.hasLatino) scoreA += 1000;
-      if (pB.hasLatino) scoreB += 1000;
+    // NIVEL 1: PRIORIDAD ABSOLUTA AL CACHÉ INSTANTÁNEO (+10000)
+    // Ningún enlace sin caché puede superar a uno en caché
+    if (pA.isCached) scoreA += 10000;
+    if (pB.isCached) scoreB += 10000;
 
-      if (pA.hasMulti && (pA.hasLatino || pA.hasCastellano)) scoreA += 400;
-      if (pB.hasMulti && (pB.hasLatino || pB.hasCastellano)) scoreB += 400;
+    // NIVEL 2: PRIORIDAD MÁXIMA AL ESPAÑOL LATINO
+    if (audioLang === 'castellano') {
+      if (pA.hasCastellano) scoreA += 3000;
+      if (pB.hasCastellano) scoreB += 3000;
 
-      if (pA.hasCastellano) scoreA += 200;
-      if (pB.hasCastellano) scoreB += 200;
+      if (pA.hasMulti && (pA.hasCastellano || pA.hasLatino)) scoreA += 1500;
+      if (pB.hasMulti && (pB.hasCastellano || pB.hasLatino)) scoreB += 1500;
 
-      if (pA.hasEnglish) scoreA += 50;
-      if (pB.hasEnglish) scoreB += 50;
-    } else if (audioLang === 'castellano') {
-      if (pA.hasCastellano) scoreA += 1000;
-      if (pB.hasCastellano) scoreB += 1000;
+      if (pA.hasLatino) scoreA += 800;
+      if (pB.hasLatino) scoreB += 800;
 
-      if (pA.hasMulti && (pA.hasCastellano || pA.hasLatino)) scoreA += 400;
-      if (pB.hasMulti && (pB.hasCastellano || pB.hasLatino)) scoreB += 400;
-
-      if (pA.hasLatino) scoreA += 200;
-      if (pB.hasLatino) scoreB += 200;
-
-      if (pA.hasEnglish) scoreA += 50;
-      if (pB.hasEnglish) scoreB += 50;
+      if (pA.hasEnglish) scoreA += 200;
+      if (pB.hasEnglish) scoreB += 200;
     } else {
-      // Idioma "todos": premiar enlaces en español (latino o castellano)
-      if (pA.hasLatino || pA.hasCastellano) scoreA += 300;
-      if (pB.hasLatino || pB.hasCastellano) scoreB += 300;
-      if (pA.hasMulti) scoreA += 150;
-      if (pB.hasMulti) scoreB += 150;
+      // Prioridad Español Latino (por defecto para todos los clientes)
+      if (pA.hasLatino) scoreA += 3000;
+      if (pB.hasLatino) scoreB += 3000;
+
+      if (pA.hasMulti && (pA.hasLatino || pA.hasCastellano)) scoreA += 1500;
+      if (pB.hasMulti && (pB.hasLatino || pB.hasCastellano)) scoreB += 1500;
+
+      if (pA.hasCastellano) scoreA += 800;
+      if (pB.hasCastellano) scoreB += 800;
+
+      if (pA.hasEnglish) scoreA += 200;
+      if (pB.hasEnglish) scoreB += 200;
     }
 
-    // Calidad de Resolución
-    if (pA.resolution === '4k') scoreA += 80;
-    if (pB.resolution === '4k') scoreB += 80;
-    if (pA.resolution === '1080p') scoreA += 60;
-    if (pB.resolution === '1080p') scoreB += 60;
-    if (pA.resolution === '720p') scoreA += 20;
-    if (pB.resolution === '720p') scoreB += 20;
+    // NIVEL 3: Calidad de Resolución
+    if (pA.resolution === '4k') scoreA += 120;
+    if (pB.resolution === '4k') scoreB += 120;
+    if (pA.resolution === '1080p') scoreA += 90;
+    if (pB.resolution === '1080p') scoreB += 90;
+    if (pA.resolution === '720p') scoreA += 30;
+    if (pB.resolution === '720p') scoreB += 30;
 
-    // Calidad de Fuente
-    if (pA.source === 'BluRay Remux') scoreA += 35;
-    if (pB.source === 'BluRay Remux') scoreB += 35;
-    if (pA.source === 'BluRay') scoreA += 30;
-    if (pB.source === 'BluRay') scoreB += 30;
+    // NIVEL 4: Calidad de Fuente
+    if (pA.source === 'BluRay Remux') scoreA += 45;
+    if (pB.source === 'BluRay Remux') scoreB += 45;
+    if (pA.source === 'BluRay') scoreA += 35;
+    if (pB.source === 'BluRay') scoreB += 35;
     if (pA.source === 'WEB-DL') scoreA += 25;
     if (pB.source === 'WEB-DL') scoreB += 25;
 
-    // Calidad de Audio
+    // NIVEL 5: Calidad de Audio
     if (pA.audioCodec?.includes('Atmos') || pA.audioCodec?.includes('TrueHD') || pA.audioCodec?.includes('DTS-HD')) scoreA += 15;
     if (pB.audioCodec?.includes('Atmos') || pB.audioCodec?.includes('TrueHD') || pB.audioCodec?.includes('DTS-HD')) scoreB += 15;
     if (pA.channels === '7.1' || pA.channels === '5.1') scoreA += 10;
     if (pB.channels === '7.1' || pB.channels === '5.1') scoreB += 10;
 
-    // Semillas (hasta 10 puntos)
+    // Semillas
     scoreA += Math.min(pA.seeds || 0, 50) / 5;
     scoreB += Math.min(pB.seeds || 0, 50) / 5;
 

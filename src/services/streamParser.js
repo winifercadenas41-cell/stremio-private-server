@@ -49,6 +49,13 @@ export function parseTorrentMetadata(stream, userMaxRes = '1080p') {
   const fullText = `${rawName} ${rawTitle} ${rawFilename}`;
   const lower = fullText.toLowerCase();
 
+  // 0. Detección de Caché Debrid (Instantáneo [TB+] vs Descarga [TB download])
+  const isCached = Boolean(
+    rawName &&
+    (rawName.includes('[TB+]') || rawName.includes('+')) &&
+    !rawName.toLowerCase().includes('download')
+  );
+
   // 1. Resolución
   let resolution = '1080p';
   let resBadge = '1080p FHD';
@@ -176,6 +183,7 @@ export function parseTorrentMetadata(stream, userMaxRes = '1080p') {
   }
 
   return {
+    isCached,
     resolution,
     resBadge,
     source,
@@ -198,11 +206,24 @@ export function parseTorrentMetadata(stream, userMaxRes = '1080p') {
 
 /**
  * Formatea un stream con el diseño elegante aprobado.
- * - name: Botón visual de 2 líneas con calidad + bandera de idioma.
- * - title: 3 líneas limpias (Calidad y Códecs, Audios identificados, Tamaño y Torbox).
+ * - name: Botón visual de 2 líneas con calidad + bandera de idioma + indicador de caché o descarga.
+ * - title: 3 líneas limpias (Calidad y Códecs, Audios identificados, Estado de Caché y Semillas).
  */
 export function formatStreamDisplay(stream, parsed, userMaxRes = '1080p') {
-  const badgeTier = userMaxRes === '4k' ? '⚡ [VIP 4K]' : '⚡ [VIP 1080p]';
+  // Distinción visual clara entre Caché Instantáneo (⚡) y Descarga Debrid (⏳)
+  let badgeTier = '';
+  let cacheText = '';
+  let cacheSummaryTag = '';
+
+  if (parsed.isCached) {
+    badgeTier = userMaxRes === '4k' ? '⚡ [VIP 4K]' : '⚡ [VIP 1080p]';
+    cacheText = '⚡ Caché Instantáneo';
+    cacheSummaryTag = '⚡ Caché';
+  } else {
+    badgeTier = userMaxRes === '4k' ? '⏳ [Descarga 4K]' : '⏳ [Descarga 1080p]';
+    cacheText = '⏳ Requiere Descarga Debrid';
+    cacheSummaryTag = '⏳ Sin Caché';
+  }
 
   // Botón izquierdo
   const name = `${badgeTier}\n${parsed.mainFlag} ${parsed.mainLang}`;
@@ -239,15 +260,15 @@ export function formatStreamDisplay(stream, parsed, userMaxRes = '1080p') {
   }
   const line2 = `🔊 ${audioDetails.join(' · ') || 'Audio Original'}`;
 
-  // Línea 3: Tamaño y Caché Rápido
+  // Línea 3: Tamaño y Caché
   const seedsInfo = parsed.seeds > 0 ? ` (${parsed.seeds} seeds)` : '';
   const sizeDisplay = parsed.sizeText ? `💾 ${parsed.sizeText}` : '💾 Directo';
-  const line3 = `${sizeDisplay} · ⚡ Torbox Instantáneo${seedsInfo}`;
+  const line3 = `${sizeDisplay} · ${cacheText}${seedsInfo}`;
 
   const title = `${line1}\n${line2}\n${line3}`;
 
   // Resumen compacto para el inspector del panel admin
-  const qualitySummary = `${parsed.resBadge} ${parsed.source} · ${parsed.mainFlag} ${parsed.mainLang}${parsed.sizeText ? ' · ' + parsed.sizeText : ''}`;
+  const qualitySummary = `${parsed.resBadge} ${parsed.source} · ${parsed.mainFlag} ${parsed.mainLang} · ${cacheSummaryTag}${parsed.sizeText ? ' · ' + parsed.sizeText : ''}`;
 
   return {
     ...stream,

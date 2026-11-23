@@ -177,7 +177,8 @@ adminRouter.post('/users', authMiddleware, async (req, res) => {
     maxFileSizeGb,
     excludeCam,
     blockDolbyVision,
-    audioLang
+    audioLang,
+    onlyCached
   } = req.body;
 
   const randomSuffix = Math.random().toString(36).substring(2, 7);
@@ -207,7 +208,8 @@ adminRouter.post('/users', authMiddleware, async (req, res) => {
     maxFileSizeGb: maxFileSizeGb !== undefined ? parseFloat(maxFileSizeGb) : (finalRes === '4k' ? 0 : 8),
     excludeCam: excludeCam !== undefined ? Boolean(excludeCam) : true,
     blockDolbyVision: Boolean(blockDolbyVision),
-    audioLang: audioLang || 'all'
+    audioLang: audioLang || 'latino',
+    onlyCached: Boolean(onlyCached)
   });
 
   let addonSetupSuccess = false;
@@ -247,7 +249,8 @@ adminRouter.put('/users/:uuid', authMiddleware, async (req, res) => {
     maxFileSizeGb,
     excludeCam,
     blockDolbyVision,
-    audioLang
+    audioLang,
+    onlyCached
   } = req.body;
 
   const updatedUser = db.updateUser(uuid, {
@@ -257,7 +260,8 @@ adminRouter.put('/users/:uuid', authMiddleware, async (req, res) => {
     maxFileSizeGb,
     excludeCam,
     blockDolbyVision,
-    audioLang
+    audioLang,
+    onlyCached: onlyCached !== undefined ? Boolean(onlyCached) : undefined
   });
 
   if (!updatedUser) {
