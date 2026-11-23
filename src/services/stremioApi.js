@@ -109,21 +109,27 @@ export async function setupUserAddons(authKey, userUuid) {
         ]
       }
     },
-    // 2. Cyberflix Catalog (Filas con tendencias de Netflix, Disney+, Max, etc.)
+    // 2. Streaming Catalogs (Tendencias oficiales de Netflix, HBO Max, Disney+, Prime Video, Apple TV+)
     {
-      transportUrl: 'https://cyberflix.elfhosted.com/c/catalogs=netflix,disney,hbo,amazon/manifest.json',
+      transportUrl: 'https://7a82163c306e-stremio-netflix-catalog-addon.baby-beamup.club/manifest.json',
       manifest: {
-        id: 'org.cyberflix.catalog',
-        version: '1.4.1',
-        name: 'Cyberflix Catalog',
-        description: 'Tendencias populares de plataformas de streaming',
+        id: 'community.streaming-catalogs',
+        version: '1.1.1',
+        name: 'Streaming Catalogs',
+        description: 'Tendencias populares de Netflix, Disney+, HBO Max, Prime Video y Apple TV+',
         resources: ['catalog'],
         types: ['movie', 'series'],
         catalogs: [
-          { type: 'movie', id: 'cyberflix.netflix', name: 'Netflix Movies' },
-          { type: 'series', id: 'cyberflix.netflix', name: 'Netflix Series' },
-          { type: 'movie', id: 'cyberflix.disney', name: 'Disney+ Movies' },
-          { type: 'movie', id: 'cyberflix.hbo', name: 'Max Movies' }
+          { id: 'nfx', type: 'movie', name: 'Netflix' },
+          { id: 'nfx', type: 'series', name: 'Netflix' },
+          { id: 'hbm', type: 'movie', name: 'HBO Max' },
+          { id: 'hbm', type: 'series', name: 'HBO Max' },
+          { id: 'dnp', type: 'movie', name: 'Disney+' },
+          { id: 'dnp', type: 'series', name: 'Disney+' },
+          { id: 'amp', type: 'movie', name: 'Prime Video' },
+          { id: 'amp', type: 'series', name: 'Prime Video' },
+          { id: 'atp', type: 'movie', name: 'Apple TV+' },
+          { id: 'atp', type: 'series', name: 'Apple TV+' }
         ]
       }
     },
