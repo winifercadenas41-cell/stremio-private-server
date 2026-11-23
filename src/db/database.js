@@ -168,7 +168,8 @@ class Database {
       maxFileSizeGb: userData.maxFileSizeGb !== undefined ? parseFloat(userData.maxFileSizeGb) : (userData.maxRes === '4k' ? 0 : 8),
       excludeCam: userData.excludeCam !== undefined ? Boolean(userData.excludeCam) : true,
       blockDolbyVision: userData.blockDolbyVision !== undefined ? Boolean(userData.blockDolbyVision) : false,
-      audioLang: userData.audioLang || 'all',
+      audioLang: userData.audioLang || 'latino',
+      onlyCached: userData.onlyCached !== undefined ? Boolean(userData.onlyCached) : false,
       isActive: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -189,6 +190,7 @@ class Database {
     if (fields.excludeCam !== undefined) user.excludeCam = Boolean(fields.excludeCam);
     if (fields.blockDolbyVision !== undefined) user.blockDolbyVision = Boolean(fields.blockDolbyVision);
     if (fields.audioLang !== undefined) user.audioLang = fields.audioLang;
+    if (fields.onlyCached !== undefined) user.onlyCached = Boolean(fields.onlyCached);
     if (fields.isActive !== undefined) user.isActive = Boolean(fields.isActive);
     if (fields.authKey !== undefined) user.authKey = fields.authKey;
 
