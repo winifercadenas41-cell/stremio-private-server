@@ -109,7 +109,25 @@ export async function setupUserAddons(authKey, userUuid) {
         ]
       }
     },
-    // 2. Streaming Catalogs (Tendencias oficiales de Netflix, HBO Max, Disney+, Prime Video, Apple TV+)
+    // 2. The Movie Database Addon (Catálogo con sinopsis y títulos en Español)
+    {
+      transportUrl: 'https://94c8cb9f702d-tmdb-addon.baby-beamup.club/manifest.json',
+      manifest: {
+        id: 'tmdb-addon',
+        version: '3.1.7',
+        name: 'The Movie Database Addon',
+        description: 'Sinopsis y carátulas de películas y series',
+        resources: ['catalog', 'meta'],
+        types: ['movie', 'series'],
+        catalogs: [
+          { id: 'tmdb.trending', type: 'movie', name: 'Tendencias' },
+          { id: 'tmdb.trending', type: 'series', name: 'Tendencias' },
+          { id: 'tmdb.top', type: 'movie', name: 'Popular' },
+          { id: 'tmdb.top', type: 'series', name: 'Popular' }
+        ]
+      }
+    },
+    // 3. Streaming Catalogs (Tendencias oficiales de Netflix, HBO Max, Disney+, Prime Video, Apple TV+)
     {
       transportUrl: 'https://7a82163c306e-stremio-netflix-catalog-addon.baby-beamup.club/manifest.json',
       manifest: {
