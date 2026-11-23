@@ -1,8 +1,10 @@
 import { config } from '../config.js';
+import { parseTorrentMetadata, formatStreamDisplay } from './streamParser.js';
 
 /**
  * Consulta las fuentes de torrents y resuelve los enlaces cacheados en Torbox.
  * Aplica filtros avanzados: resolución, tamaño máximo en GB, exclusión de CAM, bloqueo de Dolby Vision y prioridad de idioma.
+ * Analiza metadatos y devuelve enlaces formateados visualmente para Stremio.
  */
 export async function getStreamsForMedia(type, id, filters = {}) {
   if (!config.torboxApiKey) {
@@ -22,7 +24,7 @@ export async function getStreamsForMedia(type, id, filters = {}) {
     const torrentioUrl = `https://torrentio.strem.fun/torbox=${config.torboxApiKey}/stream/${type}/${encodeURIComponent(id)}.json`;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 9000);
 
     const response = await fetch(torrentioUrl, {
       signal: controller.signal,
@@ -42,72 +44,116 @@ export async function getStreamsForMedia(type, id, filters = {}) {
     console.error('[Scrapers] Error consultando Torbox/Torrentio:', err.message);
   }
 
-  // 1. Filtrado avanzado
-  let filteredStreams = streams.filter(stream => {
-    const textToCheck = `${stream.name || ''} ${stream.title || ''} ${stream.behaviorHints?.filename || ''}`.toLowerCase();
+  // 1. Parseo inicial y Filtrado avanzado
+  const parsedStreams = [];
 
-    // Filtro 1: Excluir grabaciones de cine basura (CAM, TS, Telesync, HDCAM, Screener)
+  for (const stream of streams) {
+    const parsed = parseTorrentMetadata(stream, maxRes);
+    const fullText = `${stream.name || ''} ${stream.title || ''} ${stream.behaviorHints?.filename || ''}`.toLowerCase();
+
+    // Filtro 1: Excluir grabaciones de cine (CAM, TS, Telesync, HDCAM, Screener)
     if (excludeCam) {
-      const isCam = /\b(cam|camrip|ts|telesync|hdcam|hd-ts|screener|dvdscr)\b/i.test(textToCheck);
-      if (isCam) return false;
+      if (parsed.source === 'CAM-Rip' || /\b(cam|camrip|telesync|hdcam|hd-ts|screener|dvdscr)\b|\b(?<!d)ts\b/i.test(fullText)) {
+        continue;
+      }
     }
 
-    // Filtro 2: Bloquear Dolby Vision (para televisores que se ven morados o verdes)
+    // Filtro 2: Bloquear Dolby Vision (para TVs con incompatibilidad de perfiles que se ven moradas)
     if (blockDolbyVision) {
-      const isDV = /\b(dv|dovi|dolby[\s.-]?vision)\b/i.test(textToCheck);
-      // Si solo es Dolby Vision sin compatibilidad HDR10 básica, se descarta
-      if (isDV && !textToCheck.includes('hdr')) return false;
+      if (parsed.hdr === 'Dolby Vision' && !fullText.includes('hdr10') && !fullText.includes('hdr')) {
+        continue;
+      }
     }
 
     // Filtro 3: Resolución máxima (1080p vs 4K)
     if (maxRes === '1080p') {
-      const is4K = /\b(4k|2160p|uhd)\b/i.test(textToCheck);
-      if (is4K) return false;
+      if (parsed.resolution === '4k' || parsed.resolution === '8k' || /\b(4k|2160p|4320p|8k|uhd)\b/i.test(fullText)) {
+        continue;
+      }
     }
 
     // Filtro 4: Tamaño máximo de archivo en Gigabytes
-    if (maxFileSizeGb > 0) {
-      const sizeMatch = textToCheck.match(/(\d+(?:\.\d+)?)\s*(?:gb|gigabytes)/i);
-      if (sizeMatch) {
-        const sizeGb = parseFloat(sizeMatch[1]);
-        if (sizeGb > (maxFileSizeGb + 0.5)) return false;
+    if (maxFileSizeGb > 0 && parsed.sizeGb > 0) {
+      if (parsed.sizeGb > (maxFileSizeGb + 0.4)) {
+        continue;
       }
     }
 
-    return true;
-  });
-
-  // 2. Ordenamiento inteligente según prioridad de idioma
-  if (audioLang === 'latino' || audioLang === 'castellano' || audioLang === 'es') {
-    filteredStreams.sort((a, b) => {
-      const textA = `${a.name || ''} ${a.title || ''}`.toLowerCase();
-      const textB = `${b.name || ''} ${b.title || ''}`.toLowerCase();
-
-      let weightA = 0;
-      let weightB = 0;
-
-      if (audioLang === 'latino') {
-        if (textA.includes('latino') || textA.includes('latin')) weightA += 3;
-        if (textB.includes('latino') || textB.includes('latin')) weightB += 3;
-      } else if (audioLang === 'castellano') {
-        if (textA.includes('castellano') || textA.includes('spanish')) weightA += 3;
-        if (textB.includes('castellano') || textB.includes('spanish')) weightB += 3;
-      }
-
-      if (textA.includes('dual') || textA.includes('multi')) weightA += 1;
-      if (textB.includes('dual') || textB.includes('multi')) weightB += 1;
-
-      return weightB - weightA;
-    });
+    parsedStreams.push({ stream, parsed });
   }
 
-  // 3. Etiquetado visual
-  return filteredStreams.map(stream => {
-    const badge = maxRes === '4k' ? '⚡ [VIP 4K]' : '⚡ [VIP 1080p]';
-    return {
-      ...stream,
-      name: `${badge}\n${config.serviceName}`,
-      title: stream.title || 'Torbox Direct Stream'
-    };
+  // 2. Sistema de Puntuación y Ordenamiento Inteligente
+  parsedStreams.sort((a, b) => {
+    const pA = a.parsed;
+    const pB = b.parsed;
+
+    let scoreA = 0;
+    let scoreB = 0;
+
+    // Prioridad por Idioma
+    if (audioLang === 'latino') {
+      if (pA.hasLatino) scoreA += 1000;
+      if (pB.hasLatino) scoreB += 1000;
+
+      if (pA.hasMulti && (pA.hasLatino || pA.hasCastellano)) scoreA += 400;
+      if (pB.hasMulti && (pB.hasLatino || pB.hasCastellano)) scoreB += 400;
+
+      if (pA.hasCastellano) scoreA += 200;
+      if (pB.hasCastellano) scoreB += 200;
+
+      if (pA.hasEnglish) scoreA += 50;
+      if (pB.hasEnglish) scoreB += 50;
+    } else if (audioLang === 'castellano') {
+      if (pA.hasCastellano) scoreA += 1000;
+      if (pB.hasCastellano) scoreB += 1000;
+
+      if (pA.hasMulti && (pA.hasCastellano || pA.hasLatino)) scoreA += 400;
+      if (pB.hasMulti && (pB.hasCastellano || pB.hasLatino)) scoreB += 400;
+
+      if (pA.hasLatino) scoreA += 200;
+      if (pB.hasLatino) scoreB += 200;
+
+      if (pA.hasEnglish) scoreA += 50;
+      if (pB.hasEnglish) scoreB += 50;
+    } else {
+      // Idioma "todos": premiar enlaces en español (latino o castellano)
+      if (pA.hasLatino || pA.hasCastellano) scoreA += 300;
+      if (pB.hasLatino || pB.hasCastellano) scoreB += 300;
+      if (pA.hasMulti) scoreA += 150;
+      if (pB.hasMulti) scoreB += 150;
+    }
+
+    // Calidad de Resolución
+    if (pA.resolution === '4k') scoreA += 80;
+    if (pB.resolution === '4k') scoreB += 80;
+    if (pA.resolution === '1080p') scoreA += 60;
+    if (pB.resolution === '1080p') scoreB += 60;
+    if (pA.resolution === '720p') scoreA += 20;
+    if (pB.resolution === '720p') scoreB += 20;
+
+    // Calidad de Fuente
+    if (pA.source === 'BluRay Remux') scoreA += 35;
+    if (pB.source === 'BluRay Remux') scoreB += 35;
+    if (pA.source === 'BluRay') scoreA += 30;
+    if (pB.source === 'BluRay') scoreB += 30;
+    if (pA.source === 'WEB-DL') scoreA += 25;
+    if (pB.source === 'WEB-DL') scoreB += 25;
+
+    // Calidad de Audio
+    if (pA.audioCodec?.includes('Atmos') || pA.audioCodec?.includes('TrueHD') || pA.audioCodec?.includes('DTS-HD')) scoreA += 15;
+    if (pB.audioCodec?.includes('Atmos') || pB.audioCodec?.includes('TrueHD') || pB.audioCodec?.includes('DTS-HD')) scoreB += 15;
+    if (pA.channels === '7.1' || pA.channels === '5.1') scoreA += 10;
+    if (pB.channels === '7.1' || pB.channels === '5.1') scoreB += 10;
+
+    // Semillas (hasta 10 puntos)
+    scoreA += Math.min(pA.seeds || 0, 50) / 5;
+    scoreB += Math.min(pB.seeds || 0, 50) / 5;
+
+    return scoreB - scoreA;
+  });
+
+  // 3. Formateo visual elegante
+  return parsedStreams.map(item => {
+    return formatStreamDisplay(item.stream, item.parsed, maxRes);
   });
 }

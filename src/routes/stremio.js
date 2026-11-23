@@ -3,6 +3,8 @@ import { db } from '../db/database.js';
 import { config } from '../config.js';
 import { concurrencyService } from '../services/concurrency.js';
 import { getStreamsForMedia } from '../services/scrapers.js';
+import { getMediaMetadata } from '../services/cinemeta.js';
+import { parseDevice } from '../services/streamParser.js';
 
 export const stremioRouter = Router();
 
@@ -44,7 +46,7 @@ stremioRouter.get('/:uuid/manifest.json', (req, res) => {
 });
 
 /**
- * Lista de Streams: Genera los enlaces con filtros avanzados
+ * Lista de Streams: Genera los enlaces formateados con filtros avanzados
  */
 stremioRouter.get('/:uuid/stream/:type/:id.json', async (req, res) => {
   const { uuid, type, id } = req.params;
@@ -61,7 +63,6 @@ stremioRouter.get('/:uuid/stream/:type/:id.json', async (req, res) => {
   }
 
   try {
-    // Pasar todos los filtros personalizados de este usuario
     const filters = {
       maxRes: user.maxRes,
       maxFileSizeGb: user.maxFileSizeGb,
@@ -72,15 +73,19 @@ stremioRouter.get('/:uuid/stream/:type/:id.json', async (req, res) => {
 
     const rawStreams = await getStreamsForMedia(type, id, filters);
 
-    // Envolvemos cada stream para el interceptor de Playback 302
+    // Envolvemos cada stream con el interceptor de Playback 302 y metadatos de auditoría
     const wrappedStreams = rawStreams.map(stream => {
       if (!stream.url) return stream;
 
       const encodedTarget = Buffer.from(stream.url).toString('base64url');
-      const playbackUrl = `${config.baseUrl}/stremio/${uuid}/playback/${encodedTarget}?id=${encodeURIComponent(id)}`;
+      const qualityParam = encodeURIComponent(stream._qualitySummary || '');
+      const playbackUrl = `${config.baseUrl}/stremio/${uuid}/playback/${encodedTarget}?id=${encodeURIComponent(id)}&type=${encodeURIComponent(type)}&q=${qualityParam}`;
+
+      // Remover metadatos internos antes de enviar a la app de Stremio
+      const { _parsed, _qualitySummary, ...cleanStream } = stream;
 
       return {
-        ...stream,
+        ...cleanStream,
         url: playbackUrl
       };
     });
@@ -93,12 +98,16 @@ stremioRouter.get('/:uuid/stream/:type/:id.json', async (req, res) => {
 });
 
 /**
- * Interceptor de Playback 302 (Contador de pantallas en tiempo real)
+ * Interceptor de Playback 302 (Auditoría e Inspector en tiempo real)
  */
-stremioRouter.get('/:uuid/playback/:token', (req, res) => {
+stremioRouter.get('/:uuid/playback/:token', async (req, res) => {
   const { uuid, token } = req.params;
   const mediaId = req.query.id || 'media';
+  const mediaType = req.query.type || 'movie';
+  const streamQuality = req.query.q || 'Enlace VIP Torbox';
   const clientIp = getClientIp(req);
+  const userAgent = req.headers['user-agent'] || '';
+  const device = parseDevice(userAgent);
 
   const user = db.getUserByUuid(uuid);
 
@@ -107,11 +116,23 @@ stremioRouter.get('/:uuid/playback/:token', (req, res) => {
     return res.redirect(302, config.warningVideoUrl);
   }
 
+  // Resolver título y póster mediante Cinemeta
+  let mediaMeta = { title: mediaId, poster: '' };
+  try {
+    mediaMeta = await getMediaMetadata(mediaType, mediaId);
+  } catch (e) {}
+
   const concurrencyResult = concurrencyService.checkAndRegister(
     uuid,
     clientIp,
     mediaId,
-    user.maxScreens
+    user.maxScreens,
+    {
+      mediaTitle: mediaMeta.title,
+      mediaPoster: mediaMeta.poster,
+      streamQuality,
+      device
+    }
   );
 
   if (!concurrencyResult.allowed) {
@@ -119,7 +140,7 @@ stremioRouter.get('/:uuid/playback/:token', (req, res) => {
     return res.redirect(302, config.warningVideoUrl);
   }
 
-  console.log(`[Playback] ▶️ ¡PLAY! Cliente: ${user.name} | Pantallas activas: ${concurrencyResult.currentScreens}/${user.maxScreens}`);
+  console.log(`[Playback] ▶️ ¡PLAY! Cliente: ${user.name} | Viendo: ${mediaMeta.title} | Calidad: ${streamQuality} | Dispositivo: ${device} | Pantallas activas: ${concurrencyResult.currentScreens}/${user.maxScreens}`);
 
   try {
     const targetUrl = Buffer.from(token, 'base64url').toString('utf-8');

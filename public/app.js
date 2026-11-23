@@ -48,6 +48,14 @@ const credentialsModal = document.getElementById('credentialsModal');
 const credentialsMessage = document.getElementById('credentialsMessage');
 const copyCredentialsBtn = document.getElementById('copyCredentialsBtn');
 
+// Elementos DOM del Inspector de Sesiones en Vivo
+const liveSessionsModal = document.getElementById('liveSessionsModal');
+const liveSessionsUserName = document.getElementById('liveSessionsUserName');
+const liveSessionsSubtitle = document.getElementById('liveSessionsSubtitle');
+const liveSessionsList = document.getElementById('liveSessionsList');
+const disconnectAllSessionsBtn = document.getElementById('disconnectAllSessionsBtn');
+let currentLiveUserUuid = null;
+
 // Inicialización
 if (authToken) {
   showDashboard();
@@ -57,6 +65,9 @@ if (authToken) {
 setInterval(() => {
   if (authToken && dashboardSection && !dashboardSection.classList.contains('hidden')) {
     loadDashboardData();
+    if (currentLiveUserUuid && liveSessionsModal && !liveSessionsModal.classList.contains('hidden')) {
+      refreshLiveSessions(currentLiveUserUuid);
+    }
   }
 }, 4000);
 
@@ -277,7 +288,9 @@ function renderUsers(users) {
       : 'Sin límite';
 
     const liveSessionsPill = user.activeScreensNow > 0
-      ? `<span class="badge badge-success">🟢 ${user.activeScreensNow} / ${user.maxScreens} en vivo</span>`
+      ? `<button class="session-pill-btn" onclick="openLiveSessionsModal('${user.uuid}')" title="Ver qué películas están reproduciendo en tiempo real">
+           🟢 ${user.activeScreensNow} / ${user.maxScreens} en vivo 👁️
+         </button>`
       : `<span style="color: var(--text-muted)">0 / ${user.maxScreens}</span>`;
 
     tr.innerHTML = `
@@ -386,6 +399,9 @@ document.querySelectorAll('[data-close]').forEach(btn => {
   btn.addEventListener('click', () => {
     const targetId = btn.getAttribute('data-close');
     document.getElementById(targetId).classList.add('hidden');
+    if (targetId === 'liveSessionsModal') {
+      currentLiveUserUuid = null;
+    }
   });
 });
 
@@ -519,3 +535,104 @@ window.showCredentialsForUser = async function(uuid) {
     alert('Error obteniendo credenciales');
   }
 };
+
+// ----------------------------------------------------
+// MONITOR / INSPECTOR DE SESIONES EN VIVO
+// ----------------------------------------------------
+window.openLiveSessionsModal = async function(uuid) {
+  currentLiveUserUuid = uuid;
+  await refreshLiveSessions(uuid);
+  liveSessionsModal.classList.remove('hidden');
+};
+
+async function refreshLiveSessions(uuid) {
+  try {
+    const res = await fetch(`/admin/api/users/${uuid}/sessions`, {
+      headers: { 'Authorization': authToken }
+    });
+    if (res.status === 401) {
+      logoutBtn.click();
+      return;
+    }
+    const data = await res.json();
+    const user = data.user;
+    const sessions = data.sessions || [];
+
+    liveSessionsUserName.textContent = user.name;
+    liveSessionsSubtitle.textContent = `Pantallas en uso: ${sessions.length} de ${user.maxScreens} permitidas (${user.maxRes.toUpperCase()})`;
+
+    liveSessionsList.innerHTML = '';
+
+    if (sessions.length === 0) {
+      liveSessionsList.innerHTML = `
+        <div class="empty-sessions">
+          <p>💤 No hay ninguna pantalla reproduciendo en este momento para este cliente.</p>
+        </div>
+      `;
+      return;
+    }
+
+    sessions.forEach(s => {
+      const card = document.createElement('div');
+      card.className = 'session-card';
+
+      const posterHtml = s.mediaPoster
+        ? `<img src="${s.mediaPoster}" alt="Poster" class="session-poster" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"><span class="session-poster-placeholder" style="display:none;">🎬</span>`
+        : `<span class="session-poster-placeholder">🎬</span>`;
+
+      card.innerHTML = `
+        <div class="session-poster-box">
+          ${posterHtml}
+        </div>
+        <div class="session-info">
+          <div class="session-title">${s.mediaTitle || 'Contenido en curso'}</div>
+          <div class="session-quality">🎯 ${s.streamQuality || 'Enlace Directo Torbox'}</div>
+          <div class="session-meta">
+            <span class="device-pill">${s.device || 'Dispositivo Stremio'}</span>
+            <span class="meta-tag">🌐 IP: ${s.clientIp}</span>
+            <span class="meta-tag">⏱️ Hace ${s.durationMinutes} min</span>
+          </div>
+        </div>
+        <div class="session-actions">
+          <button class="btn btn-danger-outline btn-sm" onclick="disconnectSingleScreen('${uuid}', '${s.id}')" title="Desconectar esta pantalla">
+            ✕ Desconectar
+          </button>
+        </div>
+      `;
+      liveSessionsList.appendChild(card);
+    });
+  } catch (err) {
+    console.error('Error actualizando inspector de sesiones:', err);
+  }
+}
+
+// Desconectar una sola pantalla
+window.disconnectSingleScreen = async function(uuid, sessionId) {
+  try {
+    await fetch(`/admin/api/users/${uuid}/sessions/${sessionId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': authToken }
+    });
+    await refreshLiveSessions(uuid);
+    loadDashboardData();
+  } catch (e) {
+    alert('Error al desconectar pantalla');
+  }
+};
+
+// Desconectar todas las pantallas del usuario
+disconnectAllSessionsBtn.addEventListener('click', async () => {
+  if (!currentLiveUserUuid) return;
+  if (!confirm('¿Deseas desconectar todas las pantallas activas de este cliente?')) return;
+
+  try {
+    await fetch(`/admin/api/users/${currentLiveUserUuid}/reset-sessions`, {
+      method: 'POST',
+      headers: { 'Authorization': authToken }
+    });
+    await refreshLiveSessions(currentLiveUserUuid);
+    loadDashboardData();
+  } catch (e) {
+    alert('Error al liberar pantallas');
+  }
+});

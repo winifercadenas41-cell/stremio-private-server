@@ -284,12 +284,43 @@ adminRouter.post('/users/:uuid/toggle', authMiddleware, (req, res) => {
 });
 
 /**
- * Reiniciar sesiones activas de un usuario
+ * Obtener detalles de sesiones en vivo de un usuario (Inspector en tiempo real)
+ */
+adminRouter.get('/users/:uuid/sessions', authMiddleware, (req, res) => {
+  const { uuid } = req.params;
+  const user = db.getUserByUuid(uuid);
+  if (!user) {
+    return res.status(404).json({ error: 'Usuario no encontrado' });
+  }
+
+  const sessions = concurrencyService.getUserSessions(uuid);
+  return res.json({
+    user: {
+      name: user.name,
+      email: user.email,
+      maxScreens: user.maxScreens,
+      maxRes: user.maxRes
+    },
+    sessions
+  });
+});
+
+/**
+ * Desconectar una pantalla específica
+ */
+adminRouter.delete('/users/:uuid/sessions/:sessionId', authMiddleware, (req, res) => {
+  const { uuid, sessionId } = req.params;
+  const terminated = concurrencyService.terminateSession(uuid, sessionId);
+  return res.json({ success: true, terminated });
+});
+
+/**
+ * Reiniciar todas las sesiones activas de un usuario
  */
 adminRouter.post('/users/:uuid/reset-sessions', authMiddleware, (req, res) => {
   const { uuid } = req.params;
   concurrencyService.resetUserSessions(uuid);
-  return res.json({ success: true, message: 'Sesiones reseteadas con éxito' });
+  return res.json({ success: true, message: 'Todas las sesiones han sido reseteadas' });
 });
 
 /**

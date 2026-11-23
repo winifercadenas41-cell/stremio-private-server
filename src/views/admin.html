@@ -305,6 +305,26 @@
     </div>
   </div>
 
+  <!-- Modal Inspector de Sesiones en Vivo -->
+  <div id="liveSessionsModal" class="modal-overlay hidden">
+    <div class="modal-card" style="max-width: 680px;">
+      <div class="modal-header">
+        <h3>👁️ Monitor en Vivo: <span id="liveSessionsUserName" style="color: var(--primary);"></span></h3>
+        <button class="close-modal-btn" data-close="liveSessionsModal">&times;</button>
+      </div>
+      <p class="subtitle" id="liveSessionsSubtitle">Visualizando las pantallas que están transmitiendo en este momento.</p>
+      
+      <div id="liveSessionsList" class="live-sessions-container">
+        <!-- Inyectado dinámicamente por JS -->
+      </div>
+
+      <div class="modal-actions" style="margin-top: 1.5rem; justify-content: space-between;">
+        <button type="button" id="disconnectAllSessionsBtn" class="btn btn-danger-outline">🔄 Desconectar Todas las Pantallas</button>
+        <button type="button" class="btn btn-secondary" data-close="liveSessionsModal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/public/app.js"></script>
 </body>
 </html>

@@ -417,3 +417,126 @@ textarea {
   margin-top: 0.75rem;
   line-height: 1.4;
 }
+
+/* Live Sessions Inspector */
+.session-pill-btn {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  padding: 0.35rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: all 0.2s ease;
+}
+
+.session-pill-btn:hover {
+  background: rgba(16, 185, 129, 0.35);
+  border-color: #34d399;
+  transform: translateY(-1px);
+}
+
+.live-sessions-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-top: 1rem;
+  max-height: 52vh;
+  overflow-y: auto;
+  padding-right: 0.35rem;
+}
+
+.session-card {
+  display: flex;
+  align-items: center;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 0.85rem;
+  gap: 1rem;
+  transition: border-color 0.2s;
+}
+
+.session-card:hover {
+  border-color: var(--primary);
+}
+
+.session-poster-box {
+  width: 52px;
+  height: 76px;
+  border-radius: 0.4rem;
+  overflow: hidden;
+  background-color: #0b0f19;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.session-poster {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.session-poster-placeholder {
+  font-size: 1.5rem;
+}
+
+.session-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.session-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-main);
+  margin-bottom: 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-quality {
+  font-size: 0.8rem;
+  color: #38bdf8;
+  margin-bottom: 0.4rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.device-pill {
+  background: rgba(99, 102, 241, 0.18);
+  color: #a5b4fc;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+.meta-tag {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.empty-sessions {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--text-muted);
+  background-color: var(--bg-input);
+  border-radius: 0.75rem;
+  border: 1px dashed var(--border);
+}
